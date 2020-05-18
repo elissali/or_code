@@ -220,8 +220,6 @@ class RatingModel(object):
                 loss.backward()
 
                 clip_grad_value_(self.RNet.parameters(), 2)
-                # plot_grad_flow(self.RNet.named_parameters(), count)             ################
-                # plot_grad_flow_v0(self.RNet.named_parameters(), count)          ################
                 optimizer.step()
 
                 count += 1
@@ -332,7 +330,7 @@ class RatingModel(object):
 
         rating_lst = []
         count = 0
-        all_hiddens_list = []
+        # all_hiddens_list = []
         all_attn = np.zeros((num_items, self.cfg.LSTM.SEQ_LEN, 1))
         diff = 0
         while count < num_items:
@@ -340,8 +338,6 @@ class RatingModel(object):
             if iend > num_items:
                 diff = iend - num_items
                 iend = num_items
-                # break
-                #count = num_items - batch_size
             X_batch = X[count:iend]
             seq_lengths = sl[count:iend]
 
