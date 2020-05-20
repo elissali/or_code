@@ -86,7 +86,7 @@ class RatingModel(object):
         self.dropout = [self.cfg.TRAIN.DROPOUT.FC_1, self.cfg.TRAIN.DROPOUT.FC_2]
         self.drop_prob = self.cfg.LSTM.DROP_PROB
         self.interval = self.cfg.TRAIN.INTERVAL
-        self.loss_func = nn.MSELoss()
+        self.loss_func = nn.MSELoss()               # nn.CrossEntropyLoss()
 
         self.train_loss_history = []
         self.val_loss_history = []
