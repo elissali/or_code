@@ -28,7 +28,7 @@ Sentence_BNB = the original sentence with "but not both" inserted
 #     num_test = total - num_train
 #     return num_train, num_test
 
-def split_train_test(seed_num, save_path, input = './sentence_means_var.csv', test_pct = 0.3):
+def split_train_test(seed_num, save_path, input = './sentence_si_means.csv', test_pct = 0.3):
 
     # this function doesn't return anything; it just takes the input file
     # and writes it into two separate train/test csv files (it will create those files)
@@ -44,8 +44,6 @@ def split_train_test(seed_num, save_path, input = './sentence_means_var.csv', te
     input_df = pd.read_csv(input, sep=',')
     dict_sentence_rating = input_df[['tgrep.id', 'Mean']].groupby('tgrep.id')['Mean'].apply(float).to_dict()
         # this is a dict mapping tgrep.id to mean strength ratings
-    dict_sentence_var = input_df[['tgrep.id', 'Var']].groupby('tgrep.id')['Var'].apply(float).to_dict()
-        # dict mapping tgrep.id to variance strength ratings
     dict_id_to_sentence = input_df[['tgrep.id', 'Sentence_BNB']].groupby('tgrep.id')['Sentence_BNB'].apply(list).to_dict()
         # len(dict_sentence_strength) == 1243
         # note she has everything in a list (the ratings are in a 1-elem list) so she can append to big list below
@@ -56,14 +54,14 @@ def split_train_test(seed_num, save_path, input = './sentence_means_var.csv', te
     for (key, val) in dict_id_to_sentence.items():
         sentence_str = re.sub(" but not both", "", val[0])
         values_strength = dict_sentence_rating[key]
-        values_var = dict_sentence_var[key]
         # here, Yuxing does a bunch more stuff for various features (e.g. for is_partitive, is_modified)
         # but we don't have any of that stuff/the only thing we're looking at is Mean strength
-        example = key + ',' + format(values_strength) + ',' + format(values_var) + ',' + '"' + format(sentence_str)    + '"'
+        example = key + ',' + format(values_strength) + ',' + '"' + format(sentence_str)    + '"'
             # val looks like [0.595555] -- just wanna get it out of the list
         big_list.append(example)
-            # big_list is a list of strings formatted: 'tgrep.id,Mean,Var,"sentence string here"'
-    
+            # big_list is a list of strings formatted: 'tgrep.id,Mean'
+            # ['100501:68,0.5955555555555561,blah blah', '100564:48,0.573333333333333,blah blah', ... ] 
+
     # 2. split dataset into test and training
 
     num_examples = len(big_list)
@@ -76,7 +74,7 @@ def split_train_test(seed_num, save_path, input = './sentence_means_var.csv', te
     
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Var,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
@@ -93,7 +91,7 @@ def split_train_test(seed_num, save_path, input = './sentence_means_var.csv', te
 
 
 
-def split_k_fold(seed_num, save_path, splits=6, input='./sentence_means_var.csv'):
+def split_k_fold(seed_num, save_path, splits=6, input='./sentence_si_means.csv'):
     logging.info(f'Splitting data into {splits} training/test splits\n========================')
     logging.info(f'Using random seed {seed_num}, file loaded from {input}')
 
@@ -102,7 +100,6 @@ def split_k_fold(seed_num, save_path, splits=6, input='./sentence_means_var.csv'
     # 1. read the file (all of this is same as in split_train_test):
     input_df = pd.read_csv(input, sep=',')
     dict_sentence_rating = input_df[['tgrep.id', 'Mean']].groupby('tgrep.id')['Mean'].apply(float).to_dict()
-    dict_sentence_var = input_df[['tgrep.id', 'Var']].groupby('tgrep.id')['Var'].apply(float).to_dict()
     dict_id_to_sentence = input_df[['tgrep.id', 'Sentence_BNB']].groupby('tgrep.id')['Sentence_BNB'].apply(list).to_dict()
 
     assert len(dict_sentence_rating) == len(dict_id_to_sentence)
@@ -113,8 +110,7 @@ def split_k_fold(seed_num, save_path, splits=6, input='./sentence_means_var.csv'
         sentence_ = re.sub(" uh,", "", sentence)
         sentence_str = re.sub(" um,", "", sentence_)
         values_strength = dict_sentence_rating[key]
-        values_var = dict_sentence_var[key]
-        example = key + ',' + format(values_strength) + ',' + format(values_var) + ',' + '"' + format(sentence_str)    + '"'
+        example = key + ',' + format(values_strength) + ',' + '"' + format(sentence_str)    + '"'
         big_list.append(example)
 
     # 2. split k_fold, and for each k, split into test/train:
@@ -130,7 +126,7 @@ def split_k_fold(seed_num, save_path, splits=6, input='./sentence_means_var.csv'
         # 3. write out train_db and test_db for each of the splits:
         split_save_path = os.path.join(save_path, str(j))
         mkdir_p(split_save_path)
-        head_line = "Item,Mean,Var,Sentence\n"
+        head_line = "Item,Mean,Sentence\n"
 
         with open(split_save_path + '/train_db.csv', 'w') as f:     # write train_db
             f.write(head_line)
