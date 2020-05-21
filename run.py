@@ -399,11 +399,14 @@ def main():
         max_value = -1.0
         max_epoch = None
         curr_coeff_lst = []
+
+        # for each epoch: predict scores (means)
         for epoch in epoch_lst:
             cfg.RESUME_DIR = load_path + "/RNet_epoch_" + format(epoch)+ ".pth"
             eval_model = RatingModel(cfg, eval_path)
-            preds, attn_weights = eval_model.evaluate(word_embs_stack.float(), sl)
+            preds, attn_weights = eval_model.evaluate(word_embs_stack.float(), sl)      # preds is np array of scores (mean preds)
 
+            # if attention, log the attention weights
             if cfg.LSTM.ATTN:
                 attn_path = os.path.join(eval_path, "Attention")
                 mkdir_p(attn_path)
@@ -411,18 +414,22 @@ def main():
                 np.save(new_file_name, attn_weights)
                 logging.info(f'Write attention weights to {new_file_name}.')
             
-            print("line 478")
-            print(len(normalized_labels))                                   # checkpoint
+            print("Checkpoint: Predicting correlation coefficients... ")
+            print(len(normalized_labels))                                   # checkpoint; normalized_labels should be same shape as preds
             print(preds.shape)
 
+            # calculate correlation coefficient between predicted means and actual label means (for this epoch)
             curr_coeff = np.corrcoef(preds, np.array(normalized_labels))[0, 1]
             curr_coeff_lst.append(curr_coeff)
-            if max_value < curr_coeff:
+
+            # if current epoch's coeff is the best one so far, save this coeff and save this epoch
+            if max_value < curr_coeff: 
                 max_value = curr_coeff
                 max_epoch_dir = cfg.RESUME_DIR
                 max_epoch = epoch
+
             if cfg.SAVE_PREDS:
-                print("-------------i am saving things!-------------")
+                print("Checkpoint: Saving preds...")
                 pred_file_path = eval_path + '/Preds'
                 mkdir_p(pred_file_path)
                 new_file_name = pred_file_path + '/' + cfg.PREDON + '_preds_rating_epoch' + format(epoch) + '.csv'
