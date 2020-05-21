@@ -195,9 +195,6 @@ def main():
     elif cfg.MODE == 'test':
         load_db = curr_path + "/" + cfg.PREDON + "_db.csv"
 
-    curr_max = 1                                                      
-    curr_min = 0                                                      
-    max_diff = curr_max - curr_min
 
     ################################# LOADING WORD EMBEDDINGS ##################################
 
@@ -405,7 +402,7 @@ def main():
         for epoch in epoch_lst:
             cfg.RESUME_DIR = load_path + "/RNet_epoch_" + format(epoch)+ ".pth"
             eval_model = RatingModel(cfg, eval_path)
-            preds, attn_weights = eval_model.evaluate(word_embs_stack.float(), max_diff, curr_min, sl)
+            preds, attn_weights = eval_model.evaluate(word_embs_stack.float(), sl)
 
             if cfg.LSTM.ATTN:
                 attn_path = os.path.join(eval_path, "Attention")
