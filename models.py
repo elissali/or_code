@@ -311,7 +311,7 @@ class RatingModel(object):
         val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]
         return total_val_loss, val_coeff
 
-    def evaluate(self, X, max_diff, min_value, sl):
+    def evaluate(self, X, sl):
         """Make predictions and evaluate the model
         Positional arguments:
         X -- vector representations for all examples
@@ -370,7 +370,7 @@ class RatingModel(object):
             if attn_weights is not None:
                 all_attn[count:iend, :max_seq_len_batch, :] = revert_attn_weights[:, :, :]
             for curr_score in temp_rating:
-                rating_lst.append(curr_score*max_diff+min_value)
+                rating_lst.append(curr_score)                       # removed max_diff, min_value
             count += batch_size
         return np.array(rating_lst), all_attn
 
