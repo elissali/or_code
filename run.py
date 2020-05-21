@@ -336,6 +336,7 @@ def main():
 
         X, y, L = dict(), dict(), dict()
         if not cfg.CROSS_VALIDATION_FLAG:
+            # no k-fold validation; super simple
             cfg.BATCH_ITEM_NUM = len(normalized_labels)//cfg.TRAIN.BATCH_SIZE
             X["train"], X["val"] = word_embs_stack.float(), None
             y["train"], y["val"] = np.array(normalized_labels), None
@@ -351,6 +352,8 @@ def main():
             sl_np = np.array(sl)
             fold_cnt = 1
             for train_idx, val_idx in k_folds_idx(cfg.KFOLDS, 871, cfg.SEED):                           # manual 871 training size here
+
+                # get training embeddings, y labels for indices in fold/batch:
                 logging.info(f'Fold #{fold_cnt}\n- - - - - - - - - - - - -')
                 save_sub_path = os.path.join(save_path, format(fold_cnt))
                 X_train, X_val = word_embs_stack[train_idx], word_embs_stack[val_idx]
@@ -360,12 +363,18 @@ def main():
                 y["train"], y["val"] = y_train, y_val
                 L["train"], L["val"] = L_train, L_val
                 cfg.BATCH_ITEM_NUM = len(L_train)//cfg.TRAIN.BATCH_SIZE
+
+                # model load and train
                 r_model = RatingModel(cfg, save_sub_path)
                 r_model.train(X, y, L)
+
+                # save train and val loss and r history for this fold
                 train_loss_history[:, fold_cnt-1] = np.array(r_model.train_loss_history)
                 val_loss_history[:, fold_cnt-1] = np.array(r_model.val_loss_history)
                 val_r_history[:, fold_cnt-1] = np.array(r_model.val_r_history)
                 fold_cnt += 1
+
+            # get total average train/val loss and r over all folds    
             train_loss_mean = np.mean(train_loss_history, axis=1).tolist()
             val_loss_mean = np.mean(val_loss_history, axis=1).tolist()
             val_r_mean = np.mean(val_r_history, axis=1).tolist()
@@ -376,7 +385,10 @@ def main():
             logging.info(f'Avg. validation loss: {val_loss_mean}')
             logging.info(f'Avg. validation r: {val_r_mean}')
     
-    if cfg.MODE != 'qual':
+
+    ##################################### TESTING #######################################
+
+    else:
         eval_path = cfg.OUT_PATH + cfg.EXPERIMENT_NAME
         epoch_lst = [0, 1]
         i = 0
@@ -403,7 +415,7 @@ def main():
                 logging.info(f'Write attention weights to {new_file_name}.')
             
             print("line 478")
-            print(len(normalized_labels))                                 ###########################################
+            print(len(normalized_labels))                                   # checkpoint
             print(preds.shape)
 
             curr_coeff = np.corrcoef(preds, np.array(normalized_labels))[0, 1]
