@@ -28,13 +28,11 @@ from utils import mkdir_p
 print("done importing")
 
 cfg = edict()
-cfg.SOME_DATABASE = './sentence_si_means.csv'
 cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
 cfg.MODE = 'train'                       ########### THIS GETS CHANGED
 cfg.PREDICTION_TYPE = 'rating'
-cfg.IS_RANDOM = False
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
 cfg.OUT_PATH = './'
