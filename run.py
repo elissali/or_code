@@ -1,3 +1,4 @@
+print("hello?")
 import argparse
 from collections import defaultdict
 from datetime import datetime
@@ -24,17 +25,16 @@ from split_dataset import split_train_test, k_folds_idx #, num_examples
 from utils import mkdir_p
 
 
-
-######## CONFIG SETTINGS #############
+print("done importing")
 
 cfg = edict()
-# cfg.SOME_DATABASE = './sentence_si_means.csv'
-cfg.SOME_DATABASE = './sentence_mean_var.csv'
+cfg.SOME_DATABASE = './sentence_si_means.csv'
 cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
 cfg.MODE = 'train'                       ########### THIS GETS CHANGED
 cfg.PREDICTION_TYPE = 'rating'
+cfg.IS_RANDOM = False
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
 cfg.OUT_PATH = './'
@@ -92,8 +92,6 @@ NOT_EXIST = torch.FloatTensor(1, GLOVE_DIM).zero_()
 #num_train, num_test = num_examples(input=cfg.SOME_DATABASE, test_pct = 0.3)     # added to remove 954 hardcode
 
 
-######## HELPER FUNCTIONS #############
-
 def merge_yaml(new_cfg, old_cfg):
     for k, v in new_cfg.items():
         # check type
@@ -121,7 +119,9 @@ def cfg_setup(filename):
 
 
 def load_dataset(input1, t):
+    #input_df0 = pd.read_csv(input0, sep='\t')
     input_df1 = pd.read_csv(input1, sep=',')
+    #input_df2 = pd.read_csv(input2, sep='\t')
     dict_item_sentence_raw = input_df1[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
     #dict_item_paragraph_raw = input_df2[['Item_ID', '20-b']].groupby('Item_ID')['20-b'].apply(list).to_dict() #DO_NOTHING
     dict_item_paragraph_raw = input_df1[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
@@ -130,17 +130,14 @@ def load_dataset(input1, t):
         #dict_item_mean_score_raw = input_df1[['Item', 'StrengthSome']].groupby('Item')['StrengthSome'].apply(list).to_dict()
     else:
         dict_item_mean_score_raw = input_df1[['Item', 'Mean']].groupby('Item')['Mean'].apply(list).to_dict()
-        dict_item_var_score_raw = input_df1[['Item', 'Var']].groupby('Item')['Var'].apply(list).to_dict()
     dict_item_mean_score = dict()
-    dict_item_var_score = dict()
     dict_item_sentence = dict()
     dict_item_paragraph = dict()
     for (k, v) in dict_item_mean_score_raw.items():
         dict_item_mean_score[k] = v[0]
-        dict_item_var_score[k] = dict_item_var_score_raw[k]
         dict_item_sentence[k] = dict_item_sentence_raw[k]
         dict_item_paragraph[k] = dict_item_paragraph_raw[k]
-    return dict_item_mean_score, dict_item_var_score, dict_item_sentence, dict_item_paragraph
+    return dict_item_mean_score, dict_item_sentence, dict_item_paragraph
 
 
 def random_input(num_examples):
@@ -152,8 +149,6 @@ def random_input(num_examples):
         res.append(lst)
     return torch.Tensor(res)
 
-
-######## MAIN FUNCTION ##########
 
 def main():
     parser = argparse.ArgumentParser(
@@ -194,7 +189,7 @@ def main():
     logging.info('Using configurations:')
     logging.info(pprint.pformat(cfg))
     logging.info(f'Using random seed {cfg.SEED}.')
-    
+
     elif cfg.MODE == 'train':
         load_db = curr_path + "/train_db.csv"
     elif cfg.MODE == 'test':
@@ -213,7 +208,7 @@ def main():
     if not cfg.MODE == 'qual':
         if not os.path.isfile(load_db):
             split_train_test(cfg.SEED, curr_path)
-        labels, var_labels, target_utterances, contexts = load_dataset(load_db,
+        labels, target_utterances, contexts = load_dataset(load_db,
                                                            cfg.PREDICTION_TYPE)
     else:
         if not os.path.isfile(load_db):
@@ -249,7 +244,6 @@ def main():
     logging.info(f'Path to the current word embeddings: {NUMPY_PATH}')
 
     if os.path.isfile(NUMPY_PATH):
-        print("this is line 251 and i am here to fuck up your shit")
         print(NUMPY_PATH)
         word_embs_np = np.load(NUMPY_PATH)
         print("line 254: ", word_embs_np.shape)
@@ -268,21 +262,7 @@ def main():
             bert_model.eval()
             if cfg.CUDA:
                 bert_model = bert_model.cuda()
-        if cfg.MODE == 'qual':
-            # TODO: currently only BERT, in future maybe need other embedding methods as well
-            from models import get_sentence_bert
-            for input_text in sentences:
-                curr_emb, l = get_sentence_bert(input_text,
-                                                bert_tokenizer,
-                                                bert_model,
-                                                layer=cfg.BERT_LAYER,
-                                                GPU=cfg.CUDA,
-                                                LSTM=cfg.LSTM.FLAG,
-                                                max_seq_len=cfg.LSTM.SEQ_LEN,
-                                                is_single=cfg.SINGLE_SENTENCE)
-                sl.append(l)
-                word_embs.append(curr_emb)
-        else:
+        if cfg.MODE != 'qual':
             for (k, v) in tqdm(target_utterances.items(), total=len(target_utterances)):
                 #context_v = contexts[k]
                 context_v = "a" #DO_NOTHING
@@ -335,41 +315,41 @@ def main():
         np.save(LENGTH_PATH, np.array(sl))
         word_embs_stack = torch.stack(word_embs)
         np.save(NUMPY_PATH, word_embs_stack.numpy())
-    
-    mean_labels = []
-    keys = []                                                           # replaced all "normalized_labels"/"original_labels"
-                                                                        # with "mean_labels" since our labels are already normalised
-    for (k, v) in labels.items():
-        keys.append(k)
-        mean_labels.append(float(v))        
 
-    # train mode:
+    
+    normalized_labels = []
+    keys = []                                                                                  
+    if not cfg.MODE == 'qual':
+        for (k, v) in labels.items():
+            keys.append(k)
+            normalized_labels.append(float(v))        
+
+
     if cfg.TRAIN.FLAG:
         logging.info("Start training\n===============================")
         save_path = cfg.OUT_PATH + cfg.EXPERIMENT_NAME
 
         X, y, L = dict(), dict(), dict()
         if not cfg.CROSS_VALIDATION_FLAG:
-            cfg.BATCH_ITEM_NUM = len(mean_labels)//cfg.TRAIN.BATCH_SIZE
+            cfg.BATCH_ITEM_NUM = len(normalized_labels)//cfg.TRAIN.BATCH_SIZE
             X["train"], X["val"] = word_embs_stack.float(), None
-            y["train"], y["val"] = np.array(mean_labels), None
+            y["train"], y["val"] = np.array(normalized_labels), None
             L["train"], L["val"] = sl, None
             r_model = RatingModel(cfg, save_path)
             r_model.train(X, y, L)
-
         else:
             # train with k folds cross validation
             train_loss_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
             val_loss_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
             val_r_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
-            mean_labels = np.array(mean_labels)
+            normalized_labels = np.array(normalized_labels)
             sl_np = np.array(sl)
             fold_cnt = 1
             for train_idx, val_idx in k_folds_idx(cfg.KFOLDS, 871, cfg.SEED):                           ################### manual 871 training size here
                 logging.info(f'Fold #{fold_cnt}\n- - - - - - - - - - - - -')
                 save_sub_path = os.path.join(save_path, format(fold_cnt))
                 X_train, X_val = word_embs_stack[train_idx], word_embs_stack[val_idx]
-                y_train, y_val = mean_labels[train_idx], mean_labels[val_idx]
+                y_train, y_val = normalized_labels[train_idx], normalized_labels[val_idx]
                 L_train, L_val = sl_np[train_idx].tolist(), sl_np[val_idx].tolist()
                 X["train"], X["val"] = X_train, X_val
                 y["train"], y["val"] = y_train, y_val
@@ -390,9 +370,8 @@ def main():
             logging.info(f'Avg. train loss: {train_loss_mean}')
             logging.info(f'Avg. validation loss: {val_loss_mean}')
             logging.info(f'Avg. validation r: {val_r_mean}')
-
-    # test mode:
-    else:
+    
+    if cfg.MODE != 'qual':
         eval_path = cfg.OUT_PATH + cfg.EXPERIMENT_NAME
         epoch_lst = [0, 1]
         i = 0
@@ -419,17 +398,17 @@ def main():
                 logging.info(f'Write attention weights to {new_file_name}.')
             
             print("line 478")
-            # print(len(mean_labels))                                 
-            # print(preds.shape)
+            print(len(normalized_labels))                                 ###########################################
+            print(preds.shape)
 
-            curr_coeff = np.corrcoef(preds, np.array(mean_labels))[0, 1]
+            curr_coeff = np.corrcoef(preds, np.array(normalized_labels))[0, 1]
             curr_coeff_lst.append(curr_coeff)
             if max_value < curr_coeff:
                 max_value = curr_coeff
                 max_epoch_dir = cfg.RESUME_DIR
                 max_epoch = epoch
             if cfg.SAVE_PREDS:
-                print("Saving predictions...")
+                print("-------------i am saving things!-------------")
                 pred_file_path = eval_path + '/Preds'
                 mkdir_p(pred_file_path)
                 new_file_name = pred_file_path + '/' + cfg.PREDON + '_preds_rating_epoch' + format(epoch) + '.csv'
@@ -439,9 +418,9 @@ def main():
                 f.write(head_line)
                 for i in range(len(keys)):
                     k = keys[i]
-                    means = mean_labels[i]
+                    ori = normalized_labels[i]
                     pre = preds[i]
-                    curr_line = k + '\t' + format(means) + '\t' + format(pre)
+                    curr_line = k + '\t' + format(ori) + '\t' + format(pre)
                     f.write(curr_line+"\n")
                 f.close()
         logging.info(f'Max r = {max_value} achieved at epoch {max_epoch}')
