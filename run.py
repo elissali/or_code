@@ -195,11 +195,12 @@ def main():
     elif cfg.MODE == 'test':
         load_db = curr_path + "/" + cfg.PREDON + "_db.csv"
 
-    curr_max = 1                                                      ########### REMOVE THIS SINCE NOT NORMALIZING
-    curr_min = 0                                                      ########### or rather leaving it in but just not executing anything that calls it
+    curr_max = 1                                                      
+    curr_min = 0                                                      
     max_diff = curr_max - curr_min
 
-    # obtain pre-trained word vectors
+    ################################# LOADING WORD EMBEDDINGS ##################################
+
     sl = []
     word_embs = []
     word_embs_np = None
@@ -316,6 +317,8 @@ def main():
         word_embs_stack = torch.stack(word_embs)
         np.save(NUMPY_PATH, word_embs_stack.numpy())
 
+
+    ################################# LOADING Y-LABELS ##################################
     
     normalized_labels = []
     keys = []                                                                                  
@@ -324,6 +327,8 @@ def main():
             keys.append(k)
             normalized_labels.append(float(v))        
 
+
+    ##################################### TRAINING #######################################
 
     if cfg.TRAIN.FLAG:
         logging.info("Start training\n===============================")
@@ -345,7 +350,7 @@ def main():
             normalized_labels = np.array(normalized_labels)
             sl_np = np.array(sl)
             fold_cnt = 1
-            for train_idx, val_idx in k_folds_idx(cfg.KFOLDS, 871, cfg.SEED):                           ################### manual 871 training size here
+            for train_idx, val_idx in k_folds_idx(cfg.KFOLDS, 871, cfg.SEED):                           # manual 871 training size here
                 logging.info(f'Fold #{fold_cnt}\n- - - - - - - - - - - - -')
                 save_sub_path = os.path.join(save_path, format(fold_cnt))
                 X_train, X_val = word_embs_stack[train_idx], word_embs_stack[val_idx]
