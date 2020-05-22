@@ -20,15 +20,24 @@ sentence_orig = the original sentence
 Sentence_BNB = the original sentence with "but not both" inserted
 '''
 
-# def num_examples(input = './sentence_si_means.csv', test_pct = 0.3):    # added
-#     input_df = pd.read_csv(input, sep=',')
-#     dict_sentence_rating = input_df[['tgrep.id', 'Mean']].groupby('tgrep.id')['Mean'].apply(float).to_dict()
-#     total = len(dict_sentence_rating)
-#     num_train = math.ceil((1-test_pct) * num_examples)
-#     num_test = total - num_train
-#     return num_train, num_test
 
-def split_train_test(seed_num, save_path, input = './sentence_si_means.csv', test_pct = 0.3):
+def get_distrib(array, buckets):
+    distrib = np.zeros(buckets)
+    tot_ratings = len(array)
+    for i in range(buckets):
+        bucket = i+1
+        distrib[i] = array.count(bucket) / tot_ratings
+    return distrib
+
+def get_distrib_dict(ratings_list, buckets):
+    distrib_dict = dict()
+    for tgrep in ratings_list.keys():
+        distrib_dict[tgrep] = get_distrib(ratings_list[tgrep], buckets)
+    return distrib_dict
+
+
+
+def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, test_pct = 0.3):
 
     # this function doesn't return anything; it just takes the input file
     # and writes it into two separate train/test csv files (it will create those files)
@@ -40,27 +49,24 @@ def split_train_test(seed_num, save_path, input = './sentence_si_means.csv', tes
     random.seed(seed_num)   
 
     # 1. read file:
-
     input_df = pd.read_csv(input, sep=',')
-    dict_sentence_rating = input_df[['tgrep.id', 'Mean']].groupby('tgrep.id')['Mean'].apply(float).to_dict()
-        # this is a dict mapping tgrep.id to mean strength ratings
-    dict_id_to_sentence = input_df[['tgrep.id', 'Sentence_BNB']].groupby('tgrep.id')['Sentence_BNB'].apply(list).to_dict()
-        # len(dict_sentence_strength) == 1243
-        # note she has everything in a list (the ratings are in a 1-elem list) so she can append to big list below
-
+    input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)      # discretize raw ratings
+    ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
+    dict_sentence_rating = get_distrib_dict(ratings_list, buckets)
+        # this is a dict mapping tgrep.id to 7-dim vector distribution of strength ratings
+    intermed = input_df.groupby('tgrep.id')['sentence_bnb'].first()
+    dict_id_to_sentence = intermed.groupby('tgrep.id').apply(list).to_dict()
+        # this maps tgrep.id to sentence string in a list
     assert len(dict_sentence_rating) == len(dict_id_to_sentence)
 
     big_list = []
     for (key, val) in dict_id_to_sentence.items():
-        sentence_str = re.sub(" but not both", "", val[0])
-        values_strength = dict_sentence_rating[key]
-        # here, Yuxing does a bunch more stuff for various features (e.g. for is_partitive, is_modified)
-        # but we don't have any of that stuff/the only thing we're looking at is Mean strength
-        example = key + ',' + format(values_strength) + ',' + '"' + format(sentence_str)    + '"'
-            # val looks like [0.595555] -- just wanna get it out of the list
+        sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
+        values_strength = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
+        example = key + ',' + format(values_strength).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
         big_list.append(example)
-            # big_list is a list of strings formatted: 'tgrep.id,Mean'
-            # ['100501:68,0.5955555555555561,blah blah', '100564:48,0.573333333333333,blah blah', ... ] 
+            # big_list is a list of strings formatted: 'tgrep.id, distrib, sentence'
+            # ['100501:68,[0, 0.33, ... 0.11],blah blah', '100564:48, [0.33, 0.2, ... 0.33],blah blah', ...] 
 
     # 2. split dataset into test and training
 
@@ -74,7 +80,7 @@ def split_train_test(seed_num, save_path, input = './sentence_si_means.csv', tes
     
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Sentence\n"                   # set the header
+    head_line = "Item,Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
@@ -91,26 +97,27 @@ def split_train_test(seed_num, save_path, input = './sentence_si_means.csv', tes
 
 
 
-def split_k_fold(seed_num, save_path, splits=6, input='./sentence_si_means.csv'):
+def split_k_fold(seed_num, save_path, splits=6, input='./data_2.csv', buckets=7):
     logging.info(f'Splitting data into {splits} training/test splits\n========================')
     logging.info(f'Using random seed {seed_num}, file loaded from {input}')
 
     random.seed(seed_num)
 
     # 1. read the file (all of this is same as in split_train_test):
+    # all of this is the same as in split_train_test
     input_df = pd.read_csv(input, sep=',')
-    dict_sentence_rating = input_df[['tgrep.id', 'Mean']].groupby('tgrep.id')['Mean'].apply(float).to_dict()
-    dict_id_to_sentence = input_df[['tgrep.id', 'Sentence_BNB']].groupby('tgrep.id')['Sentence_BNB'].apply(list).to_dict()
-
+    input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)      # discretize raw ratings
+    ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
+    dict_sentence_rating = get_distrib_dict(ratings_list, buckets)
+    intermed = input_df.groupby('tgrep.id')['sentence_bnb'].first()
+    dict_id_to_sentence = intermed.groupby('tgrep.id').apply(list).to_dict()
     assert len(dict_sentence_rating) == len(dict_id_to_sentence)
 
     big_list = []
     for (key, val) in dict_id_to_sentence.items():
-        sentence = re.sub(" but not both", "", val[0])
-        sentence_ = re.sub(" uh,", "", sentence)
-        sentence_str = re.sub(" um,", "", sentence_)
-        values_strength = dict_sentence_rating[key]
-        example = key + ',' + format(values_strength) + ',' + '"' + format(sentence_str)    + '"'
+        sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
+        values_strength = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
+        example = key + ',' + format(values_strength).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
         big_list.append(example)
 
     # 2. split k_fold, and for each k, split into test/train:
@@ -126,7 +133,7 @@ def split_k_fold(seed_num, save_path, splits=6, input='./sentence_si_means.csv')
         # 3. write out train_db and test_db for each of the splits:
         split_save_path = os.path.join(save_path, str(j))
         mkdir_p(split_save_path)
-        head_line = "Item,Mean,Sentence\n"
+        head_line = "Item,Distrib,Sentence\n"
 
         with open(split_save_path + '/train_db.csv', 'w') as f:     # write train_db
             f.write(head_line)
