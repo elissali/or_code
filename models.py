@@ -216,9 +216,8 @@ class RatingModel(object):
                     output_scores, _ = self.RNet(pack, len(seq_lengths), seq_lengths)
                 else:
                     output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7])
-                print(output_scores.shape)
                 optimizer.zero_grad()
-                loss = self.loss_func(output_scores, y_batch)
+                loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks
                 total_loss += loss.item()
                 loss.backward()
 
@@ -298,7 +297,7 @@ class RatingModel(object):
                 else:
                     output_scores, _ = self.RNet(X_batch)
 
-                loss = self.loss_func(output_scores, y_batch)
+                loss = self.loss_func(output_scores.log(), y_batch)         # output_scores needs to be log because KLDiv sucks
                 total_val_loss += loss.item()
 
                 output_scores = output_scores.data.tolist()
@@ -306,11 +305,15 @@ class RatingModel(object):
                 temp_rating = [0]*len(sort_idx)
                 cnt = 0
                 for s in sort_idx:
-                    temp_rating[s] = output_scores[cnt][0]
+                    temp_rating[s] = output_scores[cnt]             # [7-dim distribution of probabilities]
                     cnt += 1
                 for curr_score in temp_rating:
-                    y_preds_lst.append(curr_score*6 + 1)
+                    y_preds_lst.append(curr_score)                  # y_preds_lst = list of lists of length 7
         y_val = y_val[val_inds]
+        # print("------------------------------------------------------------------------------")
+        # print(np.shape(y_preds_lst))
+        # print(y_val.shape)
+        # print("------------------------------------------------------------------------------")
         val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]
         return total_val_loss, val_coeff
 
