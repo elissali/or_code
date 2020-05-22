@@ -52,6 +52,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     input_df = pd.read_csv(input, sep=',')
 
     dict_sentence_mean = input_df.groupby('tgrep.id')['response_val'].mean().to_dict()  # this is dict mapping tgrep.id to means
+    dict_sentence_var = input_df.groupby('tgrep.id')['response_val'].var().to_dict()    # dict mapping tgrep.id to variance
 
     input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)      # discretize raw ratings
     ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
@@ -67,10 +68,10 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
             sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
             distrib = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
             mean = dict_sentence_mean[key]
-            example = key + ',' + format(mean) + ',' + format(distrib).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
+            var = dict_sentence_var[key]
+            example = key + ',' + format(mean) + ',' + format(var) + ',' + format(distrib).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
             big_list.append(example)
-                # big_list is a list of strings formatted: 'tgrep.id, distrib, sentence'
-                # ['100501:68,0.577,[0, 0.33, ... 0.11],blah blah', '100564:48, 0.236, [0.33, 0.2, ... 0.33],blah blah', ...] 
+                # big_list is a list of strings formatted: 'tgrep.id, mean, var, distrib, sentence'
 
     # 2. split dataset into test and training
 
@@ -84,7 +85,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Distrib,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Var,Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
