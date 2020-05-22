@@ -28,6 +28,7 @@ from utils import mkdir_p
 print("done importing")
 
 cfg = edict()
+cfg.SOME_DATABASE = './data_2.csv'
 cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
