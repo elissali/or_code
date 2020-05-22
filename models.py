@@ -199,7 +199,8 @@ class RatingModel(object):
                 seq_lengths.sort(reverse=True)
                 X_batch = X_batch[sort_idx].float()
                 y_batch = y_batch[sort_idx]
-                y_batch = torch.from_numpy(y_batch).float()
+                y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim)
+                # print(y_batch.shape)
 
                 if self.cfg.CUDA:
                     X_batch = X_batch.cuda()
