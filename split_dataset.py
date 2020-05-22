@@ -99,56 +99,6 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
 
 
 
-def split_k_fold(seed_num, save_path, splits=6, input='./data_2.csv', buckets=7):
-    logging.info(f'Splitting data into {splits} training/test splits\n========================')
-    logging.info(f'Using random seed {seed_num}, file loaded from {input}')
-
-    random.seed(seed_num)
-
-    # 1. read the file (all of this is same as in split_train_test):
-    # all of this is the same as in split_train_test
-    input_df = pd.read_csv(input, sep=',')
-    input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)      # discretize raw ratings
-    ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
-    dict_sentence_rating = get_distrib_dict(ratings_list, buckets)
-    intermed = input_df.groupby('tgrep.id')['sentence_bnb'].first()
-    dict_id_to_sentence = intermed.groupby('tgrep.id').apply(list).to_dict()
-    assert len(dict_sentence_rating) == len(dict_id_to_sentence)
-
-    big_list = []
-    for (key, val) in dict_id_to_sentence.items():
-        sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
-        values_strength = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
-        example = key + ',' + format(values_strength).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
-        big_list.append(example)
-
-    # 2. split k_fold, and for each k, split into test/train:
-    num_examples = len(big_list)
-    ids = list(range(0, num_examples))
-    random.shuffle(ids)
-    k_fraction = int(len(ids) / splits)
-    for j in range(splits):
-        train_ids = ids[0:k_fraction * j] + ids[k_fraction * (j+1):]
-        test_ids = ids[k_fraction * j : k_fraction * (j+1)]
-        print("-----------new fold: first 5 test_ids ", test_ids[:5])
-
-        # 3. write out train_db and test_db for each of the splits:
-        split_save_path = os.path.join(save_path, str(j))
-        mkdir_p(split_save_path)
-        head_line = "Item,Distrib,Sentence\n"
-
-        with open(split_save_path + '/train_db.csv', 'w') as f:     # write train_db
-            f.write(head_line)
-            for i in train_ids:
-                f.write(big_list[i]+"\n")
-    
-        with open(split_save_path + '/test_db.csv', 'w') as f:      # write test_db
-            f.write(head_line)
-            for i in test_ids:
-                f.write(big_list[i]+"\n")
-    return
-
-
 def k_folds_idx(k, num_examples, seed_num):
     all_inds = list(range(num_examples))
     cv = KFold(n_splits = k, shuffle = True, random_state = seed_num)
