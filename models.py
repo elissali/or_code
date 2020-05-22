@@ -269,6 +269,9 @@ class RatingModel(object):
         batch_inds = list(BatchSampler(RandomSampler(X_val),
                                        batch_size=self.batch_size,
                                        drop_last=False))
+
+        # print(np.shape(batch_inds))                           # batch_inds = (6, 32) = (num_batches, batch_size)
+
         total_val_loss = 0
         y_preds_lst = []
         val_inds = []
@@ -297,8 +300,8 @@ class RatingModel(object):
                 else:
                     output_scores, _ = self.RNet(X_batch)
 
-                loss = self.loss_func(output_scores.log(), y_batch)         # output_scores needs to be log because KLDiv sucks
-                total_val_loss += loss.item()
+                loss = self.loss_func(output_scores.log(), y_batch)         # output_scores needs to be log because KLDiv sucks; this is batch loss
+                total_val_loss += loss.item()       
 
                 output_scores = output_scores.data.tolist()
 
@@ -310,11 +313,7 @@ class RatingModel(object):
                 for curr_score in temp_rating:
                     y_preds_lst.append(curr_score)                  # y_preds_lst = list of lists of length 7
         y_val = y_val[val_inds]
-        # print("------------------------------------------------------------------------------")
-        # print(np.shape(y_preds_lst))
-        # print(y_val.shape)
-        # print("------------------------------------------------------------------------------")
-        val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]
+        val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]           # this is totally wrong and needs to be changed
         return total_val_loss, val_coeff
 
     def evaluate(self, X, sl):
