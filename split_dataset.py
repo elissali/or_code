@@ -50,13 +50,14 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
 
     # 1. read file:
     input_df = pd.read_csv(input, sep=',')
+
+    dict_sentence_mean = input_df.groupby('tgrep.id')['response_val'].mean().to_dict()  # this is dict mapping tgrep.id to means
+
     input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)      # discretize raw ratings
     ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
-    dict_sentence_rating = get_distrib_dict(ratings_list, buckets)
-        # this is a dict mapping tgrep.id to 7-dim vector distribution of strength ratings
+    dict_sentence_rating = get_distrib_dict(ratings_list, buckets)                      # this is a dict mapping tgrep.id to 7-dim vector distribution of strength ratings
     intermed = input_df.groupby('tgrep.id')['sentence_bnb'].first()
-    dict_id_to_sentence = intermed.groupby('tgrep.id').apply(list).to_dict()
-        # this maps tgrep.id to sentence string in a list
+    dict_id_to_sentence = intermed.groupby('tgrep.id').apply(list).to_dict()            # this maps tgrep.id to sentence string in a list
     assert len(dict_sentence_rating) == len(dict_id_to_sentence)
 
     big_list = []
@@ -64,11 +65,12 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
         if val[0] == 'nan': continue
         else:
             sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
-            values_strength = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
-            example = key + ',' + format(values_strength).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
+            distrib = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
+            mean = dict_sentence_mean[key]
+            example = key + ',' + format(mean) + ',' + format(distrib).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
             big_list.append(example)
                 # big_list is a list of strings formatted: 'tgrep.id, distrib, sentence'
-                # ['100501:68,[0, 0.33, ... 0.11],blah blah', '100564:48, [0.33, 0.2, ... 0.33],blah blah', ...] 
+                # ['100501:68,0.577,[0, 0.33, ... 0.11],blah blah', '100564:48, 0.236, [0.33, 0.2, ... 0.33],blah blah', ...] 
 
     # 2. split dataset into test and training
 
@@ -82,7 +84,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     
 
     mkdir_p(save_path)
-    head_line = "Item,Distrib,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
