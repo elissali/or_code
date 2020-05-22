@@ -188,7 +188,7 @@ def main():
     logging.info(pprint.pformat(cfg))
     logging.info(f'Using random seed {cfg.SEED}.')
 
-    elif cfg.MODE == 'train':
+    if cfg.MODE == 'train':
         load_db = curr_path + "/train_db.csv"
     elif cfg.MODE == 'test':
         load_db = curr_path + "/" + cfg.PREDON + "_db.csv"
