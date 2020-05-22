@@ -314,13 +314,12 @@ def main():
 
     ################################# LOADING Y-LABELS ##################################
     
-    normalized_labels = []
-    keys = []                                                                                  
+    normalized_labels = []      # list of arrays
+    keys = []                   # list of tgrep ids                                                                            
     if not cfg.MODE == 'qual':
         for (k, v) in labels.items():
             keys.append(k)
-            normalized_labels.append(float(v))        
-
+            normalized_labels.append(list(map(float, v)))
 
     ##################################### TRAINING #######################################
 
