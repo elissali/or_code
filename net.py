@@ -98,6 +98,7 @@ class BiLSTM(nn.Module):
         self.define_module()
 
     def define_module(self):
+        self.bucket = 7
         self.lstm = nn.LSTM(self.vec_dim,
                             self.hidden_dim,
                             self.num_layers,
@@ -106,12 +107,12 @@ class BiLSTM(nn.Module):
                             bidirectional=self.bidirect)
         if self.bidirect:
             self.get_score = nn.Sequential(
-                nn.Linear(self.hidden_dim*2, 1, bias=True),
-                nn.Sigmoid())
+                nn.Linear(self.hidden_dim*2, self.bucket, bias=True),
+                nn.Softmax())                           # from nn.Sigmoid
         else:
             self.get_score = nn.Sequential(
-                nn.Linear(self.hidden_dim, 1, bias=True),
-                nn.Sigmoid())
+                nn.Linear(self.hidden_dim, self.bucket, bias=True),
+                nn.Softmax())                           # from nn.Sigmoid
 
     def forward(self, x, batch_size, seq_lens):
         """
@@ -173,6 +174,7 @@ class BiLSTMAttn(nn.Module):
         self.define_module()
 
     def define_module(self):
+        self.bucket = 7
         self.lstm = nn.LSTM(self.vec_dim,
                             self.hidden_dim,
                             self.num_layers,
@@ -182,13 +184,13 @@ class BiLSTMAttn(nn.Module):
         if self.bidirect:
             self.attention = SelfAttention(self.hidden_dim*2, self.is_gpu)
             self.get_score = nn.Sequential(
-                nn.Linear(self.hidden_dim*2, 1, bias=True),
-                nn.Sigmoid())
+                nn.Linear(self.hidden_dim*2, self.bucket, bias=True),
+                nn.Softmax())                               # from nn.Sigmoid
         else:
             self.attention = SelfAttention(self.hidden_dim, self.is_gpu)
             self.get_score = nn.Sequential(
-                nn.Linear(self.hidden_dim, 1, bias=True),
-                nn.Sigmoid())
+                nn.Linear(self.hidden_dim, self.bucket, bias=True),
+                nn.Softmax())                               # from nn.Sigmoid
 
     def forward(self, x, batch_size, seq_lens):
         """
