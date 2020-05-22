@@ -87,6 +87,7 @@ class RatingModel(object):
         self.drop_prob = self.cfg.LSTM.DROP_PROB
         self.interval = self.cfg.TRAIN.INTERVAL
         self.loss_func = nn.KLDivLoss()               # nn.KLDivLoss()
+            # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  KLDivLoss() requires first arg to be log probs
 
         self.train_loss_history = []
         self.val_loss_history = []
