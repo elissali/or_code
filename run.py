@@ -122,21 +122,20 @@ def load_dataset(input1, t):
     input_df1 = pd.read_csv(input1, sep=',')
     #input_df2 = pd.read_csv(input2, sep='\t')
     dict_item_sentence_raw = input_df1[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
-    #dict_item_paragraph_raw = input_df2[['Item_ID', '20-b']].groupby('Item_ID')['20-b'].apply(list).to_dict() #DO_NOTHING
-    dict_item_paragraph_raw = input_df1[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
-    if t == 'strength':
-        x = 0 # DO_NOTHING
-        #dict_item_mean_score_raw = input_df1[['Item', 'StrengthSome']].groupby('Item')['StrengthSome'].apply(list).to_dict()
-    else:
-        dict_item_mean_score_raw = input_df1[['Item', 'Mean']].groupby('Item')['Mean'].apply(list).to_dict()
-    dict_item_mean_score = dict()
+    intermed = input_df1[['Item', 'Distrib']].groupby('Item')['Distrib'].apply(list)
+
+    dict_item_distrib = dict()
     dict_item_sentence = dict()
-    dict_item_paragraph = dict()
-    for (k, v) in dict_item_mean_score_raw.items():
-        dict_item_mean_score[k] = v[0]
+
+    for (k, v) in intermed.items():
+        v = v[0]
+        v = v.strip(']')
+        v = v.strip('[')
+        v = v.split()
+        dict_item_distrib[k] = v
         dict_item_sentence[k] = dict_item_sentence_raw[k]
-        dict_item_paragraph[k] = dict_item_paragraph_raw[k]
-    return dict_item_mean_score, dict_item_sentence, dict_item_paragraph
+
+    return dict_item_distrib, dict_item_sentence
 
 
 def random_input(num_examples):
@@ -205,8 +204,7 @@ def main():
     if not cfg.MODE == 'qual':
         if not os.path.isfile(load_db):
             split_train_test(cfg.SEED, curr_path)
-        labels, target_utterances, contexts = load_dataset(load_db,
-                                                           cfg.PREDICTION_TYPE)
+        labels, target_utterances = load_dataset(load_db, cfg.PREDICTION_TYPE)
     else:
         if not os.path.isfile(load_db):
             sys.exit(f'Fail to find the file {load_db} for qualitative evaluation. Exit.')
