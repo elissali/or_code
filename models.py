@@ -86,7 +86,7 @@ class RatingModel(object):
         self.dropout = [self.cfg.TRAIN.DROPOUT.FC_1, self.cfg.TRAIN.DROPOUT.FC_2]
         self.drop_prob = self.cfg.LSTM.DROP_PROB
         self.interval = self.cfg.TRAIN.INTERVAL
-        self.loss_func = nn.MSELoss()               # nn.CrossEntropyLoss()
+        self.loss_func = nn.KLDivLoss()               # nn.KLDivLoss()
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -155,10 +155,11 @@ class RatingModel(object):
              chopping/padding
         """
         X_train, X_val = X["train"], X["val"]
-        y_train, y_val = y["train"], y["val"]
+        y_train, y_val = y["train"], y["val"]           # shape = (696, 7)
         L_train, L_val = L["train"], L["val"]
+        
+        y_train = np.expand_dims(y_train, axis=1)       # shape = (696, 1, 7)
 
-        y_train = np.expand_dims(y_train, axis=1)
         self.load_network()
         # gpu
         if self.cfg.CUDA:
@@ -214,7 +215,8 @@ class RatingModel(object):
                                                 batch_first=True)
                     output_scores, _ = self.RNet(pack, len(seq_lengths), seq_lengths)
                 else:
-                    output_scores, _ = self.RNet(X_batch)
+                    output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7])
+                print(output_scores.shape)
                 optimizer.zero_grad()
                 loss = self.loss_func(output_scores, y_batch)
                 total_loss += loss.item()
