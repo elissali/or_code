@@ -61,12 +61,14 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
 
     big_list = []
     for (key, val) in dict_id_to_sentence.items():
-        sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
-        values_strength = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
-        example = key + ',' + format(values_strength).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
-        big_list.append(example)
-            # big_list is a list of strings formatted: 'tgrep.id, distrib, sentence'
-            # ['100501:68,[0, 0.33, ... 0.11],blah blah', '100564:48, [0.33, 0.2, ... 0.33],blah blah', ...] 
+        if val[0] == 'nan': continue
+        else:
+            sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
+            values_strength = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
+            example = key + ',' + format(values_strength).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
+            big_list.append(example)
+                # big_list is a list of strings formatted: 'tgrep.id, distrib, sentence'
+                # ['100501:68,[0, 0.33, ... 0.11],blah blah', '100564:48, [0.33, 0.2, ... 0.33],blah blah', ...] 
 
     # 2. split dataset into test and training
 
