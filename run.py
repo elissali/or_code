@@ -27,7 +27,7 @@ from utils import mkdir_p
 print("done importing")
 
 cfg = edict()
-cfg.SOME_DATABASE = './data_2.csv'
+cfg.SOME_DATABASE = './data_2.csv'      
 cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
@@ -122,10 +122,10 @@ def load_dataset(input1, t):
     dict_item_sentence_raw = input_df[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
 
     if t == 'discrete_distrib':
-        intermed = input_df[['Item', 'Distrib']].groupby('Item')['Distrib'].apply(list)
+        dict_discrete = input_df[['Item', 'Discrete_Distrib']].groupby('Item')['Discrete_Distrib'].apply(list)
         dict_item_distrib = dict()
         dict_item_sentence = dict()
-        for (k, v) in intermed.items():
+        for (k, v) in dict_discrete.items():
             v = v[0]
             v = v.strip(']')
             v = v.strip('[')
