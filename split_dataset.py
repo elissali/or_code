@@ -51,27 +51,30 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     # 1. read file:
     input_df = pd.read_csv(input, sep=',')
 
-    dict_sentence_mean = input_df.groupby('tgrep.id')['response_val'].mean().to_dict()  # this is dict mapping tgrep.id to means
-    dict_sentence_var = input_df.groupby('tgrep.id')['response_val'].var().to_dict()    # dict mapping tgrep.id to variance
+    _ = input_df.groupby('tgrep.id')['sentence_bnb'].first()
+    dict_id_to_sentence = _.groupby('tgrep.id').apply(list).to_dict()                       # {tgrep.id : sentence_str}
+    dict_sentence_mean = input_df.groupby('tgrep.id')['response_val'].mean().to_dict()      # {tgrep.id : mean}
+    dict_sentence_var = input_df.groupby('tgrep.id')['response_val'].var().to_dict()        # {tgrep.id : var}
+    dict_raw_distrib = input_df.groupby('tgrep.id')['response_val'].apply(list).to_dict()   # {tgrep.id : [raw ratings]}
 
-    input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)      # discretize raw ratings
+    input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)          # discretize raw ratings
     ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
-    dict_sentence_rating = get_distrib_dict(ratings_list, buckets)                      # this is a dict mapping tgrep.id to 7-dim vector distribution of strength ratings
-    intermed = input_df.groupby('tgrep.id')['sentence_bnb'].first()
-    dict_id_to_sentence = intermed.groupby('tgrep.id').apply(list).to_dict()            # this maps tgrep.id to sentence string in a list
-    assert len(dict_sentence_rating) == len(dict_id_to_sentence)
+    dict_discrete_distrib = get_distrib_dict(ratings_list, buckets)                         # {tgrep.id : [7-bucket distribution]}
+
+    assert len(dict_discrete_distrib) == len(dict_id_to_sentence)
 
     big_list = []
     for (key, val) in dict_id_to_sentence.items():
         if val[0] == 'nan': continue
         else:
-            sentence_str = re.sub(" but not both", "", val[0])      # the sentence string
-            distrib = dict_sentence_rating[key]             # the distribution of ratings (7-dim vec)
-            mean = dict_sentence_mean[key]
-            var = dict_sentence_var[key]
-            example = key + ',' + format(mean) + ',' + format(var) + ',' + format(distrib).replace('\n', '') + ',' + '"' + format(sentence_str)    + '"'
+            sentence_str = re.sub(" but not both", "", val[0])                          # the sentence string
+            raw_distrib = str(dict_raw_distrib[key]).replace(",", " ")
+            discrete_distrib = str(dict_discrete_distrib[key]).replace('\n', '')        # the distribution of ratings (7-dim vec)
+            mean = str(dict_sentence_mean[key])
+            var = str(dict_sentence_var[key])
+            example = key + ',' + mean + ',' + var + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
             big_list.append(example)
-                # big_list is a list of strings formatted: 'tgrep.id, mean, var, distrib, sentence'
+                # big_list is a list of strings formatted: 'tgrep.id, mean, var, raw_distrib, discrete_distrib, sentence'
 
     # 2. split dataset into test and training
 
@@ -82,10 +85,9 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     random.shuffle(ids)             # shuffle them! 
     train_ids = ids[:num_train]     # training examples = the first num_train number of examples from big_list, by index in big_list
     test_ids = ids[num_train:]      # testing examples = what's left over, by index in big_list
-    
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Var,Distrib,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Var,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
@@ -116,7 +118,7 @@ def main():
     parser.add_argument('--path', dest='path', type=str, required=True)
     parser.add_argument('-k', dest='k', type=int, default=6)
     opt = parser.parse_args()
-    split_k_fold(opt.seed, opt.path, splits=opt.k)
+    # split_k_fold(opt.seed, opt.path, splits=opt.k)
 
 if __name__ == '__main__':
     main()
