@@ -1,4 +1,3 @@
-print("hello?")
 import argparse
 from collections import defaultdict
 from datetime import datetime
@@ -33,7 +32,7 @@ cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
 cfg.MODE = 'train'                       ########### THIS GETS CHANGED
-cfg.PREDICTION_TYPE = 'rating'
+cfg.PREDICTION_TYPE = 'discrete_distrib'          # can be: 'rating', 'discrete_distrib', 'mdn_distrib'
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
 cfg.OUT_PATH = './'
@@ -118,24 +117,34 @@ def cfg_setup(filename):
 
 
 def load_dataset(input1, t):
-    #input_df0 = pd.read_csv(input0, sep='\t')
-    input_df1 = pd.read_csv(input1, sep=',')
-    #input_df2 = pd.read_csv(input2, sep='\t')
-    dict_item_sentence_raw = input_df1[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
-    intermed = input_df1[['Item', 'Distrib']].groupby('Item')['Distrib'].apply(list)
 
-    dict_item_distrib = dict()
-    dict_item_sentence = dict()
+    input_df = pd.read_csv(input1, sep=',')
+    dict_item_sentence_raw = input_df[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
 
-    for (k, v) in intermed.items():
-        v = v[0]
-        v = v.strip(']')
-        v = v.strip('[')
-        v = v.split()
-        dict_item_distrib[k] = v
-        dict_item_sentence[k] = dict_item_sentence_raw[k]
-
-    return dict_item_distrib, dict_item_sentence
+    if t == 'discrete_distrib':
+        intermed = input_df[['Item', 'Distrib']].groupby('Item')['Distrib'].apply(list)
+        dict_item_distrib = dict()
+        dict_item_sentence = dict()
+        for (k, v) in intermed.items():
+            v = v[0]
+            v = v.strip(']')
+            v = v.strip('[')
+            v = v.split()
+            dict_item_distrib[k] = v
+            dict_item_sentence[k] = dict_item_sentence_raw[k]
+        return dict_item_distrib, dict_item_sentence
+    
+    elif t == 'rating':
+        dict_item_mean_raw = input_df[['Item', 'Mean']].groupby('Item')['Mean'].apply(list).to_dict()
+        dict_item_mean = dict()
+        dict_item_sentence = dict()
+        for (k,v) in dict_item_mean_raw.items():
+            dict_item_mean[k] = v[0]
+            dict_item_sentence[k] = dict_item_sentence_raw[k]
+        return dict_item_mean, dict_item_sentence
+    
+    elif t == 'mdn_distrib':
+        pass
 
 
 def random_input(num_examples):
