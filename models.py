@@ -86,8 +86,12 @@ class RatingModel(object):
         self.dropout = [self.cfg.TRAIN.DROPOUT.FC_1, self.cfg.TRAIN.DROPOUT.FC_2]
         self.drop_prob = self.cfg.LSTM.DROP_PROB
         self.interval = self.cfg.TRAIN.INTERVAL
-        self.loss_func = nn.KLDivLoss()               # nn.KLDivLoss()
-            # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  KLDivLoss() requires first arg to be log probs
+        
+        if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+            self.loss_func = nn.KLDivLoss()               # nn.KLDivLoss()
+                # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  KLDivLoss() requires first arg to be log probs
+        elif self.cfg.PREDICTION_TYPE == 'rating':
+            self.loss_func = nn.MSELoss()
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -218,7 +222,11 @@ class RatingModel(object):
                 else:
                     output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7])
                 optimizer.zero_grad()
-                loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks
+
+                if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+                    loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks
+                elif self.cfg.PREDICTION_TYPE == 'rating':
+                    loss = self.loss_func(output_scores, y_batch)
                 total_loss += loss.item()
                 loss.backward()
 
@@ -301,20 +309,31 @@ class RatingModel(object):
                 else:
                     output_scores, _ = self.RNet(X_batch)
 
-                loss = self.loss_func(output_scores.log(), y_batch)         # output_scores needs to be log because KLDiv sucks; this is batch loss
+                if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+                    loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks; this is batch loss
+                elif self.cfg.PREDICTION_TYPE == 'rating':
+                    loss = self.loss_func(output_scores, y_batch)                
+                
                 total_val_loss += loss.item()       
-
                 output_scores = output_scores.data.tolist()
 
                 temp_rating = [0]*len(sort_idx)
                 cnt = 0
                 for s in sort_idx:
-                    temp_rating[s] = output_scores[cnt]             # [7-dim distribution of probabilities]
+                    if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+                        temp_rating[s] = output_scores[cnt]             # [7-dim distribution of probabilities]
+                    elif self.cfg.PREDICTION_TYPE == 'rating':
+                        temp_rating[s] = output_scores[cnt][0]          # float
                     cnt += 1
                 for curr_score in temp_rating:
                     y_preds_lst.append(curr_score)                  # y_preds_lst = list of lists of length 7
         y_val = y_val[val_inds]
-        val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]           # this is totally wrong and needs to be changed
+        
+        if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+            val_coeff = 0
+        elif self.cfg.PREDICTION_TYPE == 'rating':
+            val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]        
+
         return total_val_loss, val_coeff
 
     def evaluate(self, X, sl):
@@ -368,7 +387,10 @@ class RatingModel(object):
             if attn_weights is not None:
                 revert_attn_weights = np.zeros(attn_weights.shape)  # (batch_size, 8, seq_len, seq_len)
             for s in sort_idx:
-                temp_rating[s] = output_scores[cnt][0]
+                if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+                    temp_rating[s] = output_scores[cnt]
+                elif self.cfg.PREDICTION_TYPE == 'rating':
+                    temp_rating[s] = output_scores[cnt][0]
                 if attn_weights is not None:
                     revert_attn_weights[s, :, :] = attn_weights[cnt, :, :]
                 cnt += 1
