@@ -32,7 +32,7 @@ cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
 cfg.MODE = 'train'                                  # remember to change to 'test' vs. 'train'
-cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'mdn_distrib'
+cfg.PREDICTION_TYPE = 'rating'            # can be: 'rating', 'discrete_distrib', 'mdn_distrib'
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
 cfg.OUT_PATH = './'
@@ -326,9 +326,15 @@ def main():
     normalized_labels = []      # list of arrays
     keys = []                   # list of tgrep ids                                                                            
     if not cfg.MODE == 'qual':
-        for (k, v) in labels.items():
-            keys.append(k)
-            normalized_labels.append(list(map(float, v)))
+        if cfg.PREDICTION_TYPE == "discrete_distrib":
+            for (k, v) in labels.items():
+                keys.append(k)
+                normalized_labels.append(list(map(float, v)))
+        elif cfg.PREDICTION_TYPE == "rating":
+            for (k, v) in labels.items():
+                keys.append(k)
+                normalized_labels.append(float(v))
+
 
     ##################################### TRAINING #######################################
 
