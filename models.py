@@ -220,7 +220,10 @@ class RatingModel(object):
                 seq_lengths.sort(reverse=True)
                 X_batch = X_batch[sort_idx].float()
                 y_batch = y_batch[sort_idx]
-                y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
+                if self.cfg.PREDICTION_TYPE == "discrete_distrib":
+                    y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
+                elif self.cfg.PREDICTION_TYPE == "rating":
+                    y_batch = torch.from_numpy(y_batch).float()
                 # print(y_batch.shape)
 
                 if self.cfg.CUDA:
@@ -310,8 +313,11 @@ class RatingModel(object):
                 seq_lengths.sort(reverse=True)
                 X_batch = X_batch[sort_idx].float()
                 y_batch = y_batch[sort_idx]
-                y_batch = torch.from_numpy(y_batch).float()
-
+                if self.cfg.PREDICTION_TYPE == "rating":
+                    y_batch = torch.from_numpy(y_batch).float().resize_((len(y_batch),1))       # y_batch by itself is [32]; need to resize to [32,1] 
+                elif self.cfg.PREDICTION_TYPE == "discrete_distrib":                            # for consistency to avoid error from broadcasting
+                    y_batch = torch.from_numpy(y_batch).float()
+                
                 if self.cfg.CUDA:
                     X_batch = X_batch.cuda()
                     y_batch = y_batch.cuda()
@@ -323,7 +329,7 @@ class RatingModel(object):
                                                  seq_lengths)
                 else:
                     output_scores, _ = self.RNet(X_batch)
-
+                
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks; this is batch loss
                 elif self.cfg.PREDICTION_TYPE == 'rating':
