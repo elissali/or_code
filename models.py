@@ -115,7 +115,7 @@ class RatingModel(object):
 
     def load_network(self):
         """Initialize the network or load from checkpoint"""
-        from net import RateNet, RateNet2D, BiLSTM, BiLSTMAttn
+        from net import RateNet, RateNet2D, BiLSTM, BiLSTMAttn, BiLSTM_Disc, BiLSTMAttn_Disc
         logging.info('initializing neural net')
 
         self.RNet = None
@@ -124,21 +124,36 @@ class RatingModel(object):
             vec_dim = ELMO_DIM
         elif self.cfg.IS_BERT:
             vec_dim = BERT_LARGE_DIM if self.cfg.BERT_LARGE else BERT_DIM
-        if self.cfg.LSTM.FLAG:
-            if self.cfg.LSTM.ATTN:
-                self.RNet = BiLSTMAttn(vec_dim, self.cfg.LSTM.SEQ_LEN,
-                                       self.cfg.LSTM.HIDDEN_DIM,
-                                       self.cfg.LSTM.LAYERS,
-                                       self.drop_prob, self.dropout,
-                                       self.cfg.LSTM.BIDIRECTION,
-                                       self.cfg.CUDA)
-            else:
-                self.RNet = BiLSTM(vec_dim, self.cfg.LSTM.SEQ_LEN,
-                                   self.cfg.LSTM.HIDDEN_DIM,
-                                   self.cfg.LSTM.LAYERS,
-                                   self.drop_prob, self.dropout,
-                                   self.cfg.LSTM.BIDIRECTION, self.cfg.CUDA)
-        else:
+        if self.cfg.LSTM.FLAG:                                                          # if using an LSTM
+            if self.cfg.LSTM.ATTN:                                                      # if using an LSTM with attention
+                if self.cfg.PREDICTION_TYPE == "rating":                                # if predicting mean rating
+                    self.RNet = BiLSTMAttn(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                        self.cfg.LSTM.HIDDEN_DIM,
+                                        self.cfg.LSTM.LAYERS,
+                                        self.drop_prob, self.dropout,
+                                        self.cfg.LSTM.BIDIRECTION,
+                                        self.cfg.CUDA)
+                elif self.cfg.PREDICTION_TYPE == "discrete_distrib":                    # if predicting distribution
+                    self.RNet = BiLSTMAttn_Disc(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                        self.cfg.LSTM.HIDDEN_DIM,
+                                        self.cfg.LSTM.LAYERS,
+                                        self.drop_prob, self.dropout,
+                                        self.cfg.LSTM.BIDIRECTION,
+                                        self.cfg.CUDA)                   
+            else:                                                                       # if using an LSTM with no attention
+                if self.cfg.PREDICTION_TYPE == "rating":                                # if predicting mean rating
+                    self.RNet = BiLSTM(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                    self.cfg.LSTM.HIDDEN_DIM,
+                                    self.cfg.LSTM.LAYERS,
+                                    self.drop_prob, self.dropout,
+                                    self.cfg.LSTM.BIDIRECTION, self.cfg.CUDA)
+                elif self.cfg.PREDICTION_TYPE == "discrete_distrib":                    # if predicting distribution
+                    self.RNet = BiLSTM_Disc(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                    self.cfg.LSTM.HIDDEN_DIM,
+                                    self.cfg.LSTM.LAYERS,
+                                    self.drop_prob, self.dropout,
+                                    self.cfg.LSTM.BIDIRECTION, self.cfg.CUDA)
+        else:                                                                           # if not using an LSTM
             self.RNet = RateNet(vec_dim, self.dropout)
         self.RNet.apply(weights_init)
 
@@ -160,7 +175,7 @@ class RatingModel(object):
              chopping/padding
         """
         X_train, X_val = X["train"], X["val"]
-        y_train, y_val = y["train"], y["val"]           # shape = (696, 7)
+        y_train, y_val = y["train"], y["val"]           # shape = (696, 7) if discrete_distrib; else (696, 1)
         L_train, L_val = L["train"], L["val"]
         
         y_train = np.expand_dims(y_train, axis=1)       # shape = (696, 1, 7)
@@ -205,7 +220,7 @@ class RatingModel(object):
                 seq_lengths.sort(reverse=True)
                 X_batch = X_batch[sort_idx].float()
                 y_batch = y_batch[sort_idx]
-                y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim)
+                y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
                 # print(y_batch.shape)
 
                 if self.cfg.CUDA:
@@ -220,7 +235,7 @@ class RatingModel(object):
                                                 batch_first=True)
                     output_scores, _ = self.RNet(pack, len(seq_lengths), seq_lengths)
                 else:
-                    output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7])
+                    output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7]) if discrete distrib
                 optimizer.zero_grad()
 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
