@@ -351,7 +351,8 @@ class RatingModel(object):
         y_val = y_val[val_inds]
         
         if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
-            val_coeff = 0
+            val_coeff = np.mean([np.corrcoef(i, j)[0,1] for i, j in zip(np.array(y_preds_lst), np.array(y_val))])
+            
         elif self.cfg.PREDICTION_TYPE == 'rating':
             val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]        
 
