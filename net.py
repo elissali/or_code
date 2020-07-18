@@ -444,7 +444,7 @@ class BiLSTMAttn_Beta(nn.Module):
     using a bidirectional LSTM. It feeds the input through LSTM. The LSTM
     output is then passed through a self-attention layer to get a weighted sum.
     Then, the hidden states are fed into a projection layer, which in return is
-    passed through a softmax function to predict the discretized distribution.
+    passed through a softmax function to predict the beta parameters.
     """
     def __init__(self, vec_dim, seq_len, hidden_dim, num_layers, drop_prob, dropout, bidirection, is_gpu, batch_size=32):
         super(BiLSTMAttn_Beta, self).__init__()
