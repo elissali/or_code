@@ -76,7 +76,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
             var = str(dict_sentence_var[key])
             alpha, beta = dict_beta[key]                                                # this is a duplicate of the following row (kinda)
             params = str(dict_beta[key]).replace(",", " ")                              # dunno whether I want alpha/beta in one tuple, or separated
-            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' params + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
+            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' + params + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
             big_list.append(example)
                 # big_list is a list of strings formatted: 'tgrep.id, mean, var, alpha, beta, raw_distrib, discrete_distrib, sentence'
 
