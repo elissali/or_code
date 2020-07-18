@@ -359,6 +359,155 @@ class BiLSTMAttn_Disc(nn.Module):
         x, attn_weights = self.attention(x, seq_lens)
         return self.get_score(x), attn_weights
 
+
+################ BETA DISTRIB MODEL #######################
+# (Bi-)LSTM model
+class BiLSTM_Beta(nn.Module):
+    """
+    The purpose of this module is to encode a sequence (sentence/paragraph)
+    using a bidirectional LSTM. It feeds the input through LSTM and returns
+    all the hidden states.
+    Then, the hidden states are fed into a projection layer, which in return is
+    passed through a softmax function to predict the beta parameters.
+    """
+    def __init__(self, vec_dim, seq_len, hidden_dim, num_layers, drop_prob, dropout, bidirection, is_gpu, batch_size=32):
+        super(BiLSTM_Beta, self).__init__()
+        self.vec_dim = vec_dim
+        self.seq_len = seq_len
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.drop_prob = drop_prob
+        self.dropout = dropout
+        self.bidirect = bidirection
+        self.batch_size = batch_size
+        self.is_gpu = is_gpu
+        self.define_module()
+
+    def define_module(self):
+        self.params = 2
+        self.lstm = nn.LSTM(self.vec_dim,
+                            self.hidden_dim,
+                            self.num_layers,
+                            batch_first=True,
+                            dropout=self.drop_prob,
+                            bidirectional=self.bidirect)
+        if self.bidirect:
+            self.get_score = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.params, bias=True),
+                nn.Softmax())                           # need Softmax since len(self.params) > 1
+        else:
+            self.get_score = nn.Sequential(
+                nn.Linear(self.hidden_dim, self.params, bias=True),
+                nn.Softmax())                           # need Softmax since len(self.params) > 1
+
+    def forward(self, x, batch_size, seq_lens):
+        """
+        x - Tensor shape (curr_batch_size, seq_len, input_size)
+                we need to permute the first and the second axis
+        output - Tensor shape (curr_batch_size, 1)
+        """
+#        assert x.shape[0] == batch_size
+        if self.bidirect:
+            h0 = torch.randn(self.num_layers*2, batch_size, self.hidden_dim)
+            c0 = torch.randn(self.num_layers*2, batch_size, self.hidden_dim)
+        else:
+            h0 = torch.randn(self.num_layers, batch_size, self.hidden_dim)
+            c0 = torch.randn(self.num_layers, batch_size, self.hidden_dim)
+        if self.is_gpu:
+            h0 = h0.float().cuda()
+            c0 = c0.float().cuda()
+        x, _ = self.lstm(x, (h0, c0))
+        x, _ = nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
+        if self.bidirect:
+            x = x.reshape(batch_size, seq_lens[0], self.hidden_dim*2)
+        else:
+            x = x.reshape(batch_size, seq_lens[0], self.hidden_dim)
+        x = x.permute(0, 2, 1)
+        mask = torch.zeros(x.size())
+        if self.bidirect:
+          for i in range(batch_size):
+            mask[i, :self.hidden_dim, seq_lens[i]-1] = 1
+            mask[i, self.hidden_dim:, 0] = 1
+        else:
+          for i in range(batch_size):
+              mask[i, :, seq_lens[i]-1] = 1
+        if self.is_gpu:
+            mask = mask.cuda()
+        x = x * mask  # (batch_size, hidden_dim, max_seq_len)
+        x = x.sum(dim=2)  # (batch_size, hidden_dim)
+        return self.get_score(x), None
+
+
+class BiLSTMAttn_Beta(nn.Module):
+    """
+    The purpose of this module is to encode a sequence (sentence/paragraph)
+    using a bidirectional LSTM. It feeds the input through LSTM. The LSTM
+    output is then passed through a self-attention layer to get a weighted sum.
+    Then, the hidden states are fed into a projection layer, which in return is
+    passed through a softmax function to predict the discretized distribution.
+    """
+    def __init__(self, vec_dim, seq_len, hidden_dim, num_layers, drop_prob, dropout, bidirection, is_gpu, batch_size=32):
+        super(BiLSTMAttn_Beta, self).__init__()
+        self.vec_dim = vec_dim
+        self.seq_len = seq_len
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.drop_prob = drop_prob
+        self.dropout = dropout
+        self.bidirect = bidirection
+        self.batch_size = batch_size
+        self.is_gpu = is_gpu
+        self.define_module()
+
+    def define_module(self):
+        self.params = 2
+        self.lstm = nn.LSTM(self.vec_dim,
+                            self.hidden_dim,
+                            self.num_layers,
+                            batch_first=True,
+                            dropout=self.drop_prob,
+                            bidirectional=self.bidirect)
+        if self.bidirect:
+            self.attention = SelfAttention(self.hidden_dim*2, self.is_gpu)
+            self.get_score = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.params, bias=True),
+                nn.Softmax())                               # from nn.Sigmoid
+        else:
+            self.attention = SelfAttention(self.hidden_dim, self.is_gpu)
+            self.get_score = nn.Sequential(
+                nn.Linear(self.hidden_dim, self.params, bias=True),
+                nn.Softmax())                               # from nn.Sigmoid
+
+    def forward(self, x, batch_size, seq_lens):
+        """
+        x - Tensor shape (batch_size, seq_len, input_size)
+                we need to permute the first and the second axis
+        output - Tensor shape (batch_size, 1)
+        """
+        if self.bidirect:
+            h0 = torch.randn(self.num_layers*2, batch_size, self.hidden_dim)
+            c0 = torch.randn(self.num_layers*2, batch_size, self.hidden_dim)
+        else:
+            h0 = torch.randn(self.num_layers, batch_size, self.hidden_dim)
+            c0 = torch.randn(self.num_layers, batch_size, self.hidden_dim)
+        if self.is_gpu:
+            h0 = h0.float().cuda()
+            c0 = c0.float().cuda()
+        x, _ = self.lstm(x, (h0, c0))
+        x, _ = nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
+        if self.bidirect:
+            x = x.reshape(batch_size, seq_lens[0], self.hidden_dim*2)
+        else:
+            x = x.reshape(batch_size, seq_lens[0], self.hidden_dim)
+        x, attn_weights = self.attention(x, seq_lens)
+        return self.get_score(x), attn_weights
+
+
+
+
+
+############################# SELF ATTENTION ######################################
+
 class SelfAttention(nn.Module):
 
     def __init__(self, hidden_dim, is_gpu=False):
