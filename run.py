@@ -9,6 +9,7 @@ import random
 import re
 from statistics import mean
 import sys
+from scipy import stats
 
 #from allennlp.commands.elmo import ElmoEmbedder # DO_NOTHING
 from easydict import EasyDict as edict
@@ -32,7 +33,7 @@ cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
 cfg.MODE = 'train'                                  # remember to change to 'test' vs. 'train'
-cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'mdn_distrib'
+cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mdn_distrib'
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
 cfg.OUT_PATH = './'
@@ -121,7 +122,18 @@ def load_dataset(input1, t):
     input_df = pd.read_csv(input1, sep=',')
     dict_item_sentence_raw = input_df[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
 
-    if t == 'discrete_distrib':
+    if t == 'beta_distrib':
+        dict_params = input_df[['Item', 'Params']].groupby('Item')['Params'].apply(list)
+        dict_alpha = input_df[['Item', 'Alpha']].groupby('Item')['Params'].apply(list)
+        dict_beta = input_df[['Item', 'Beta']].groupby('Item')['Params'].apply(list)
+        dict_item_params = dict()
+        dict_item_sentence = dict()
+        for (k, v) in dict_params.items():
+            dict_item_params[k] = [dict_alpha[k], dict_beta[k]]
+            dict_item_sentence[k] = dict_item_sentence_raw[k]
+        return dict_item_params, dict_item_sentence
+    
+    elif t == 'discrete_distrib':
         dict_discrete = input_df[['Item', 'Discrete_Distrib']].groupby('Item')['Discrete_Distrib'].apply(list)
         dict_item_distrib = dict()
         dict_item_sentence = dict()
@@ -326,7 +338,7 @@ def main():
     normalized_labels = []      # list of arrays
     keys = []                   # list of tgrep ids                                                                            
     if not cfg.MODE == 'qual':
-        if cfg.PREDICTION_TYPE == "discrete_distrib":
+        if cfg.PREDICTION_TYPE == "discrete_distrib" or cfg.PREDICTION_TYPE == "beta_distrib":
             for (k, v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))
