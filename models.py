@@ -92,6 +92,8 @@ class RatingModel(object):
                 # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  KLDivLoss() requires first arg to be log probs
         elif self.cfg.PREDICTION_TYPE == 'rating':
             self.loss_func = nn.MSELoss()
+        elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
+            self.loss_func = nn.MSELoss()
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -115,7 +117,7 @@ class RatingModel(object):
 
     def load_network(self):
         """Initialize the network or load from checkpoint"""
-        from net import RateNet, RateNet2D, BiLSTM, BiLSTMAttn, BiLSTM_Disc, BiLSTMAttn_Disc
+        from net import RateNet, RateNet2D, BiLSTM, BiLSTMAttn, BiLSTM_Disc, BiLSTMAttn_Disc, BiLSTM_Beta, BiLSTMAttn_Beta
         logging.info('initializing neural net')
 
         self.RNet = None
@@ -139,7 +141,14 @@ class RatingModel(object):
                                         self.cfg.LSTM.LAYERS,
                                         self.drop_prob, self.dropout,
                                         self.cfg.LSTM.BIDIRECTION,
-                                        self.cfg.CUDA)                   
+                                        self.cfg.CUDA)
+                elif self.cfg.PREDICTION_TYPE == "beta_distrib":                        # if predicting beta parameters
+                    self.RNet = BiLSTMAttn_Beta(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                        self.cfg.LSTM.HIDDEN_DIM,
+                                        self.cfg.LSTM.LAYERS,
+                                        self.drop_prob, self.dropout,
+                                        self.cfg.LSTM.BIDIRECTION,
+                                        self.cfg.CUDA)
             else:                                                                       # if using an LSTM with no attention
                 if self.cfg.PREDICTION_TYPE == "rating":                                # if predicting mean rating
                     self.RNet = BiLSTM(vec_dim, self.cfg.LSTM.SEQ_LEN,
@@ -149,6 +158,12 @@ class RatingModel(object):
                                     self.cfg.LSTM.BIDIRECTION, self.cfg.CUDA)
                 elif self.cfg.PREDICTION_TYPE == "discrete_distrib":                    # if predicting distribution
                     self.RNet = BiLSTM_Disc(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                    self.cfg.LSTM.HIDDEN_DIM,
+                                    self.cfg.LSTM.LAYERS,
+                                    self.drop_prob, self.dropout,
+                                    self.cfg.LSTM.BIDIRECTION, self.cfg.CUDA)
+                elif self.cfg.PREDICTION_TYPE == "beta_distrib":
+                    self.RNet = BiLSTM_Beta(vec_dim, self.cfg.LSTM.SEQ_LEN,
                                     self.cfg.LSTM.HIDDEN_DIM,
                                     self.cfg.LSTM.LAYERS,
                                     self.drop_prob, self.dropout,
@@ -175,10 +190,11 @@ class RatingModel(object):
              chopping/padding
         """
         X_train, X_val = X["train"], X["val"]
-        y_train, y_val = y["train"], y["val"]           # shape = (696, 7) if discrete_distrib; else (696, 1)
+        y_train, y_val = y["train"], y["val"]           # shape = (696, 7) if discrete_distrib; (696, 1) if rating; (696, 2) if beta
         L_train, L_val = L["train"], L["val"]
         
-        y_train = np.expand_dims(y_train, axis=1)       # shape = (696, 1, 7)
+        y_train = np.expand_dims(y_train, axis=1)       # shape = (696, 1, 7) if discrete_distrib
+        print("models.py ########################### y_train_shape should be (696, 1, 2): ", y_train.shape)
 
         self.load_network()
         # gpu
@@ -220,7 +236,7 @@ class RatingModel(object):
                 seq_lengths.sort(reverse=True)
                 X_batch = X_batch[sort_idx].float()
                 y_batch = y_batch[sort_idx]
-                if self.cfg.PREDICTION_TYPE == "discrete_distrib":
+                if self.cfg.PREDICTION_TYPE == "discrete_distrib" or self.cfg.PREDICTION_TYPE == "beta_distrib":
                     y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
                 elif self.cfg.PREDICTION_TYPE == "rating":
                     y_batch = torch.from_numpy(y_batch).float()
@@ -243,7 +259,7 @@ class RatingModel(object):
 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks
-                elif self.cfg.PREDICTION_TYPE == 'rating':
+                elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'beta_distrib':
                     loss = self.loss_func(output_scores, y_batch)
                 total_loss += loss.item()
                 loss.backward()
@@ -317,6 +333,8 @@ class RatingModel(object):
                     y_batch = torch.from_numpy(y_batch).float().resize_((len(y_batch),1))       # y_batch by itself is [32]; need to resize to [32,1] 
                 elif self.cfg.PREDICTION_TYPE == "discrete_distrib":                            # for consistency to avoid error from broadcasting
                     y_batch = torch.from_numpy(y_batch).float()
+                elif self.cfg.PREDICTION_TYPE == "beta_distrib":
+                    y_batch = torch.from_numpy(y_batch).float()
                 
                 if self.cfg.CUDA:
                     X_batch = X_batch.cuda()
@@ -332,7 +350,7 @@ class RatingModel(object):
                 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks; this is batch loss
-                elif self.cfg.PREDICTION_TYPE == 'rating':
+                elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'beta_distrib':
                     loss = self.loss_func(output_scores, y_batch)                
                 
                 total_val_loss += loss.item()       
@@ -341,16 +359,18 @@ class RatingModel(object):
                 temp_rating = [0]*len(sort_idx)
                 cnt = 0
                 for s in sort_idx:
-                    if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+                    if self.cfg.PREDICTION_TYPE == 'beta_distrib':
+                        temp_rating[s] = output_scores[cnt]             # [2-dim tuple of alpha, beta params]
+                    elif self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                         temp_rating[s] = output_scores[cnt]             # [7-dim distribution of probabilities]
                     elif self.cfg.PREDICTION_TYPE == 'rating':
                         temp_rating[s] = output_scores[cnt][0]          # float
                     cnt += 1
                 for curr_score in temp_rating:
-                    y_preds_lst.append(curr_score)                  # y_preds_lst = list of lists of length 7
+                    y_preds_lst.append(curr_score)                  # y_preds_lst = list of lists of length 7 if discretized distribution
         y_val = y_val[val_inds]
         
-        if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+        if self.cfg.PREDICTION_TYPE == 'discrete_distrib' or self.cfg.PREDICTION_TYPE == 'beta_distrib':
             val_coeff = np.mean([np.corrcoef(i, j)[0,1] for i, j in zip(np.array(y_preds_lst), np.array(y_val))])
             
         elif self.cfg.PREDICTION_TYPE == 'rating':
@@ -409,7 +429,7 @@ class RatingModel(object):
             if attn_weights is not None:
                 revert_attn_weights = np.zeros(attn_weights.shape)  # (batch_size, 8, seq_len, seq_len)
             for s in sort_idx:
-                if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+                if self.cfg.PREDICTION_TYPE == 'discrete_distrib' or self.cfg.PREDICTION_TYPE == 'beta_distrib':
                     temp_rating[s] = output_scores[cnt]
                 elif self.cfg.PREDICTION_TYPE == 'rating':
                     temp_rating[s] = output_scores[cnt][0]
