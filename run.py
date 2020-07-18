@@ -124,8 +124,8 @@ def load_dataset(input1, t):
 
     if t == 'beta_distrib':
         dict_params = input_df[['Item', 'Params']].groupby('Item')['Params'].apply(list)
-        dict_alpha = input_df[['Item', 'Alpha']].groupby('Item')['Alpha'].apply(list)
-        dict_beta = input_df[['Item', 'Beta']].groupby('Item')['Beta'].apply(list)
+        dict_alpha = input_df[['Item', 'Alpha']].groupby('Item')['Alpha'].apply(float)
+        dict_beta = input_df[['Item', 'Beta']].groupby('Item')['Beta'].apply(float)
         dict_item_params = dict()
         dict_item_sentence = dict()
         for (k, v) in dict_params.items():
