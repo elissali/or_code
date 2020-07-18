@@ -74,8 +74,9 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
             discrete_distrib = str(dict_discrete_distrib[key]).replace('\n', '')        # the distribution of ratings (7-dim vec)
             mean = str(dict_sentence_mean[key])
             var = str(dict_sentence_var[key])
-            alpha, beta = dict_beta[key]
-            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
+            alpha, beta = dict_beta[key]                                                # this is a duplicate of the following row (kinda)
+            params = str(dict_beta[key]).replace(",", " ")                              # dunno whether I want alpha/beta in one tuple, or separated
+            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' params + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
             big_list.append(example)
                 # big_list is a list of strings formatted: 'tgrep.id, mean, var, alpha, beta, raw_distrib, discrete_distrib, sentence'
 
@@ -90,7 +91,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     test_ids = ids[num_train:]      # testing examples = what's left over, by index in big_list
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Var,Alpha,Beta,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Var,Alpha,Beta,Params,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
