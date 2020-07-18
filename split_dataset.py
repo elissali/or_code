@@ -3,6 +3,7 @@ import logging
 import random
 import os
 import re
+from scipy import stats 
 
 import math
 import numpy as np
@@ -56,6 +57,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     dict_sentence_mean = input_df.groupby('tgrep.id')['response_val'].mean().to_dict()      # {tgrep.id : mean}
     dict_sentence_var = input_df.groupby('tgrep.id')['response_val'].var().to_dict()        # {tgrep.id : var}
     dict_raw_distrib = input_df.groupby('tgrep.id')['response_val'].apply(list).to_dict()   # {tgrep.id : [raw ratings]}
+    dict_beta = input_df.groupby('tgrep.id')['response_val'].apply(lambda x: stats.beta.fit(x, floc=-1e-8)[0:2]).to_dict()  ## {tgrep.id : [alpha, beta]}
 
     input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)          # discretize raw ratings
     ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
@@ -72,9 +74,10 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
             discrete_distrib = str(dict_discrete_distrib[key]).replace('\n', '')        # the distribution of ratings (7-dim vec)
             mean = str(dict_sentence_mean[key])
             var = str(dict_sentence_var[key])
-            example = key + ',' + mean + ',' + var + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
+            alpha, beta = dict_beta[key]
+            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
             big_list.append(example)
-                # big_list is a list of strings formatted: 'tgrep.id, mean, var, raw_distrib, discrete_distrib, sentence'
+                # big_list is a list of strings formatted: 'tgrep.id, mean, var, alpha, beta, raw_distrib, discrete_distrib, sentence'
 
     # 2. split dataset into test and training
 
@@ -87,7 +90,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     test_ids = ids[num_train:]      # testing examples = what's left over, by index in big_list
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Var,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Var,Alpha,Beta,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
