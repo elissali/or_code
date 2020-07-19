@@ -33,7 +33,7 @@ cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
 cfg.MODE = 'train'                                  # remember to change to 'test' vs. 'train'
-cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mdn_distrib'
+cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mean_var'
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
 cfg.OUT_PATH = './'
@@ -130,6 +130,15 @@ def load_dataset(input1, t):
         dict_item_sentence = dict()
         for (k, v) in dict_params.items():
             dict_item_params[k] = [dict_alpha[k], dict_beta[k]]
+            dict_item_sentence[k] = dict_item_sentence_raw[k]
+        return dict_item_params, dict_item_sentence
+    elif t == 'mean_var':
+        dict_mean = input_df[['Item', 'Mean']].groupby('Item')['Mean'].apply(float)
+        dict_var = input_df[['Item', 'Var']].groupby('Item')['Var'].apply(float)
+        dict_item_params = dict()
+        dict_item_sentence = dict()
+        for (k, v) in dict_params.items():
+            dict_item_params[k] = [dict_mean[k], dict_var[k]]
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_params, dict_item_sentence
     
@@ -338,7 +347,7 @@ def main():
     normalized_labels = []      # list of arrays
     keys = []                   # list of tgrep ids                                                                            
     if not cfg.MODE == 'qual':
-        if cfg.PREDICTION_TYPE == "discrete_distrib" or cfg.PREDICTION_TYPE == "beta_distrib":
+        if cfg.PREDICTION_TYPE == "discrete_distrib" or cfg.PREDICTION_TYPE == "beta_distrib" or cfg.PREDICTION_TYPE == "mean_var":
             for (k, v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))
