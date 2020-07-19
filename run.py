@@ -132,12 +132,13 @@ def load_dataset(input1, t):
             dict_item_params[k] = [dict_alpha[k], dict_beta[k]]
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_params, dict_item_sentence
+
     elif t == 'mean_var':
         dict_mean = input_df[['Item', 'Mean']].groupby('Item')['Mean'].apply(float)
         dict_var = input_df[['Item', 'Var']].groupby('Item')['Var'].apply(float)
         dict_item_params = dict()
         dict_item_sentence = dict()
-        for (k, v) in dict_params.items():
+        for (k, v) in dict_mean.items():
             dict_item_params[k] = [dict_mean[k], dict_var[k]]
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_params, dict_item_sentence
