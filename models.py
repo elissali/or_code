@@ -379,7 +379,7 @@ class RatingModel(object):
             alpha_val = [val[0] for val in np.array(y_val)]
             beta_preds = [preds[1] for preds in np.array(y_preds_lst)]
             beta_val = [val[1] for val in np.array(y_val)]
-            val_coeff = np.mean(np.corrcoef(alpha_preds, alpha_val), np.corrcoef(beta_preds, beta_val))
+            val_coeff = np.mean(np.corrcoef(alpha_preds, alpha_val)[0,1], np.corrcoef(beta_preds, beta_val)[0,1])
             
         elif self.cfg.PREDICTION_TYPE == 'rating':
             val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]        
