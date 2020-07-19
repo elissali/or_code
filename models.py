@@ -93,7 +93,7 @@ class RatingModel(object):
         elif self.cfg.PREDICTION_TYPE == 'rating':
             self.loss_func = nn.MSELoss()
         elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-            self.loss_func = nn.MSELoss()
+            self.loss_func = nn.L1Loss()
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -261,6 +261,7 @@ class RatingModel(object):
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'beta_distrib':
                     loss = self.loss_func(output_scores, y_batch)
+
                 total_loss += loss.item()
                 loss.backward()
 
@@ -351,7 +352,7 @@ class RatingModel(object):
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks; this is batch loss
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'beta_distrib':
-                    loss = self.loss_func(output_scores, y_batch)                
+                    loss = self.loss_func(output_scores, y_batch)
                 
                 total_val_loss += loss.item()       
                 output_scores = output_scores.data.tolist()
@@ -370,8 +371,15 @@ class RatingModel(object):
                     y_preds_lst.append(curr_score)                  # y_preds_lst = list of lists of length 7 if discretized distribution
         y_val = y_val[val_inds]
         
-        if self.cfg.PREDICTION_TYPE == 'discrete_distrib' or self.cfg.PREDICTION_TYPE == 'beta_distrib':
+        if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
             val_coeff = np.mean([np.corrcoef(i, j)[0,1] for i, j in zip(np.array(y_preds_lst), np.array(y_val))])
+        
+        elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
+            alpha_preds = [preds[0] for preds in np.array(y_preds_lst)]
+            alpha_val = [val[0] for val in np.array(y_val)]
+            beta_preds = [preds[1] for preds in np.array(y_preds_lst)]
+            beta_val = [val[1] for preds in np.array(y_val)]
+            val_coeff = np.mean(np.corrcoef(alpha_preds, alpha_val), np.corrcoef(beta_preds, beta_val))
             
         elif self.cfg.PREDICTION_TYPE == 'rating':
             val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]        
