@@ -44,7 +44,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     # and writes it into two separate train/test csv files (it will create those files)
     # and save them to save_path parameter
 
-    logging.info('Spitting data into training/test sets\n========================')
+    logging.info('Splitting data into training/test sets\n========================')
     logging.info(f'Using random seed {seed_num}, file loaded from {input}')
 
     random.seed(seed_num)   
@@ -74,7 +74,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
             discrete_distrib = str(dict_discrete_distrib[key]).replace('\n', '')        # the distribution of ratings (7-dim vec)
             mean = str(dict_sentence_mean[key])
             # var = str(dict_sentence_var[key])
-            var = np.var(dict_raw_distrib)
+            var = np.var(dict_raw_distrib[key])
             alpha, beta = dict_beta[key]                                                # this is a duplicate of the following row (kinda)
             params = str(dict_beta[key]).replace(",", " ")                              # dunno whether I want alpha/beta in one tuple, or separated
             example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' + params + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
