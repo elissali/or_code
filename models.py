@@ -90,9 +90,9 @@ class RatingModel(object):
         if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
             self.loss_func = nn.KLDivLoss()               # nn.KLDivLoss()
                 # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  KLDivLoss() requires first arg to be log probs
-        elif self.cfg.PREDICTION_TYPE == 'rating':
+        elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
             self.loss_func = nn.MSELoss()
-        elif self.cfg.PREDICTION_TYPE == 'beta_distrib' or self.cfg.PREDICTION_TYPE == 'mean_var':
+        elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
             self.loss_func = nn.L1Loss()
 
         self.train_loss_history = []
