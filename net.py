@@ -2,7 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
-import torch.distributions.beta.Beta as Beta
+from torch.distributions import Beta
 
 
 def fc_layer(in_features, out_features, dropout):
