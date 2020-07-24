@@ -236,8 +236,10 @@ class RatingModel(object):
                 seq_lengths.sort(reverse=True)
                 X_batch = X_batch[sort_idx].float()
                 y_batch = y_batch[sort_idx]
-                if self.cfg.PREDICTION_TYPE == "discrete_distrib" or self.cfg.PREDICTION_TYPE == "beta_distrib" or self.cfg.PREDICTION_TYPE == "mean_var":
+                if self.cfg.PREDICTION_TYPE == "discrete_distrib" or self.cfg.PREDICTION_TYPE == "mean_var":
                     y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
+                elif self.cfg.PREDICTION_TYPE == "beta_distrib":
+                    pass
                 elif self.cfg.PREDICTION_TYPE == "rating":
                     y_batch = torch.from_numpy(y_batch).float()
                 # print(y_batch.shape)
