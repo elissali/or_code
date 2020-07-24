@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from torch.distributions import Beta
 from tqdm import tqdm
 import yaml
 
@@ -348,7 +349,7 @@ def main():
     normalized_labels = []      # list of arrays
     keys = []                   # list of tgrep ids                                                                            
     if not cfg.MODE == 'qual':
-        if cfg.PREDICTION_TYPE == "discrete_distrib" or cfg.PREDICTION_TYPE == "beta_distrib" or cfg.PREDICTION_TYPE == "mean_var":
+        if cfg.PREDICTION_TYPE == "discrete_distrib" or cfg.PREDICTION_TYPE == "mean_var":
             for (k, v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))
@@ -356,6 +357,10 @@ def main():
             for (k, v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(float(v))
+        elif cfg.PREDICTION_TYPE == "beta_distrib":
+            for (k,v) in labels.items():
+                normalized_labels.append(Beta(torch.tensor(float(v[0])), torch.tensor(float(v[1]))))
+
 
 
     ##################################### TRAINING #######################################
