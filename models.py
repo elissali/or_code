@@ -93,7 +93,7 @@ class RatingModel(object):
         elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
             self.loss_func = nn.MSELoss()
         elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-            self.loss_func = nn.L1Loss()
+            self.loss_func = nn.KLDivLoss()              ###############################################
 
         self.train_loss_history = []
         self.val_loss_history = []
