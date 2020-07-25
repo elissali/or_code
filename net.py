@@ -436,8 +436,10 @@ class BiLSTM_Beta(nn.Module):
             mask = mask.cuda()
         x = x * mask    # (batch_size, hidden_dim, max_seq_len)
         x = x.sum(dim=2)  # (batch_size, hidden_dim)
-        alpha, beta = self.get_score(x)                                 # use get_score module to predict tuple
-        return Beta(alpha, beta), None                                  # turn the tuple into a distribution object
+        return self.get_score(x), None
+        # print("LINE 439: SELF.GET_SCORE: ", self.get_score.size())
+        # (alpha, beta) = self.get_score(x)                                 # use get_score module to predict tuple
+        # return Beta(alpha, beta), None                                  # turn the tuple into a distribution object
 
 
 class BiLSTMAttn_Beta(nn.Module):
@@ -502,8 +504,9 @@ class BiLSTMAttn_Beta(nn.Module):
         else:
             x = x.reshape(batch_size, seq_lens[0], self.hidden_dim)
         x, attn_weights = self.attention(x, seq_lens)
-        alpha, beta = self.get_score(x)                                 # get the (alpha, beta) tuple prediction
-        return Beta(alpha, beta), attn_weights                          # return the distribution object that fits the (alpha, beta)
+        # (alpha, beta) = self.get_score(x)                                 # get the (alpha, beta) tuple prediction
+        # return Beta(alpha, beta), attn_weights                          # return the distribution object that fits the (alpha, beta)
+        return self.get_score(x), attn_weights
 
 
 
