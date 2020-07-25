@@ -94,7 +94,8 @@ class RatingModel(object):
         elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
             self.loss_func = nn.MSELoss()
         elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-            self.loss_func = nn.KLDivLoss()              ###############################################
+            self.loss_func = torch.distributions.kl_divergence 
+                # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -195,7 +196,7 @@ class RatingModel(object):
         L_train, L_val = L["train"], L["val"]
         
         y_train = np.expand_dims(y_train, axis=1)       # shape = (696, 1, 7) if discrete_distrib
-        # print("models.py ########################### y_train_shape should be (696, 1, 2): ", y_train.shape)
+        print("models.py ########################### y_train_shape should be (696, 1, 2): ", y_train.shape)
 
         self.load_network()
         # gpu
@@ -240,7 +241,7 @@ class RatingModel(object):
                 if self.cfg.PREDICTION_TYPE == "discrete_distrib" or self.cfg.PREDICTION_TYPE == "mean_var":
                     y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
                 elif self.cfg.PREDICTION_TYPE == "beta_distrib":
-                    y_batch = torch.from_numpy(y_batch).float().squeeze()       ### TO CHECK ###
+                    y_batch = torch.from_numpy(y_batch).float().squeeze()
                 elif self.cfg.PREDICTION_TYPE == "rating":
                     y_batch = torch.from_numpy(y_batch).float()
                 # print(y_batch.shape)
@@ -265,7 +266,8 @@ class RatingModel(object):
                 elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
                     output_distrib = Beta(output_scores[:,0], output_scores[:,1])
                     y_distrib = Beta(y_batch[:,0], y_batch[:,1])
-                    loss = self.loss_func(output_distrib, y_distrib)
+                    loss = self.loss_func(output_distrib, y_distrib).mean()
+                    print(loss)                                             ### TODO: Loss is exploding (almost all -inf and nan)... how to fix
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
 
@@ -358,10 +360,14 @@ class RatingModel(object):
                 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks; this is batch loss
-                elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'beta_distrib' or self.cfg.PREDICTION_TYPE == 'mean_var':
+                elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
+                    output_distrib = Beta(output_scores[:,0], output_scores[:,1])
+                    y_distrib = Beta(y_batch[:,0], y_batch[:,1])
+                    loss = self.loss_func(output_distrib, y_distrib).mean() 
+                elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
                 
-                total_val_loss += loss.item()       
+                total_val_loss += loss.item()
                 output_scores = output_scores.data.tolist()
 
                 temp_rating = [0]*len(sort_idx)
