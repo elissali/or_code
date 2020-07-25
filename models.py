@@ -19,6 +19,7 @@ import torchtext.vocab as vocab
 from torch.utils.data.sampler import SequentialSampler, BatchSampler, RandomSampler
 from torch.nn.utils import clip_grad_value_
 from torch.nn.utils.rnn import pack_padded_sequence
+from torch.distributions import Beta
 
 from utils import mkdir_p, weights_init, save_model
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -239,7 +240,7 @@ class RatingModel(object):
                 if self.cfg.PREDICTION_TYPE == "discrete_distrib" or self.cfg.PREDICTION_TYPE == "mean_var":
                     y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
                 elif self.cfg.PREDICTION_TYPE == "beta_distrib":
-                    pass
+                    y_batch = torch.from_numpy(y_batch).float().squeeze()       ### TO CHECK ###
                 elif self.cfg.PREDICTION_TYPE == "rating":
                     y_batch = torch.from_numpy(y_batch).float()
                 # print(y_batch.shape)
@@ -260,8 +261,12 @@ class RatingModel(object):
                 optimizer.zero_grad()
 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
-                    loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks
-                elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'beta_distrib' or self.cfg.PREDICTION_TYPE == 'mean_var':
+                    loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv 
+                elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
+                    output_distrib = Beta(output_scores[:,0], output_scores[:,1])
+                    y_distrib = Beta(y_batch[:,0], y_batch[:,1])
+                    loss = self.loss_func(output_distrib, y_distrib)
+                elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
 
                 total_loss += loss.item()
