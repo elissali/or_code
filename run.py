@@ -359,9 +359,11 @@ def main():
                 normalized_labels.append(float(v))
         elif cfg.PREDICTION_TYPE == "beta_distrib":
             for (k,v) in labels.items():
-                alpha = float(v[0])
-                beta = float(v[1])
-                normalized_labels.append(Beta(torch.tensor(alpha), torch.tensor(beta)))
+                keys.append(k)
+                normalized_labels.append(list(map(float, v)))       # (871, 2)
+                # alpha = float(v[0])
+                # beta = float(v[1])
+                # normalized_labels.append(Beta(torch.tensor(alpha), torch.tensor(beta)))
 
 
 
