@@ -267,7 +267,7 @@ class RatingModel(object):
                     output_distrib = Beta(output_scores[:,0], output_scores[:,1])
                     y_distrib = Beta(y_batch[:,0], y_batch[:,1])
                     loss = self.loss_func(output_distrib, y_distrib).mean()
-                    print(loss)                                             ### TODO: Loss is exploding (almost all -inf and nan)... how to fix
+                    print("line 270: ",loss)                                             ### TODO: Loss is exploding (almost all -inf and nan)... how to fix
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
 
