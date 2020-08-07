@@ -259,20 +259,29 @@ class RatingModel(object):
                     output_scores, _ = self.RNet(pack, len(seq_lengths), seq_lengths)
                 else:
                     output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7]) if discrete distrib
-                optimizer.zero_grad()
+                # print(output_scores)                                    # TODO: output_scores returning mostly zeros
+                optimizer.zero_grad()                                   
 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv 
                 elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-                    output_distrib = Beta(output_scores[:,0], output_scores[:,1])
-                    y_distrib = Beta(y_batch[:,0], y_batch[:,1])
+                    alpha_scores = output_scores[:,0] + 1e-5
+                    beta_scores = output_scores[:,1] + 1e-5
+                    output_distrib = Beta(alpha_scores, beta_scores)
+                    # output_distrib = Beta(output_scores[:,0], output_scores[:,1])
+                    alpha_y = y_batch[:,0] + 1e-5
+                    beta_y = y_batch[:,1] + 1e-5
+                    y_distrib = Beta(alpha_y, beta_y)
+                    # y_distrib = Beta(y_batch[:,0], y_batch[:,1])
                     loss = self.loss_func(output_distrib, y_distrib).mean()
-                    print("line 270: ",loss)                                             ### TODO: Loss is exploding (almost all -inf and nan)... how to fix
+
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
 
                 total_loss += loss.item()
                 loss.backward()
+
+                # print("loss: ", loss)
 
                 clip_grad_value_(self.RNet.parameters(), 2)
                 optimizer.step()
@@ -369,6 +378,7 @@ class RatingModel(object):
                 
                 total_val_loss += loss.item()
                 output_scores = output_scores.data.tolist()
+                print("output_scores: ", output_scores)
 
                 temp_rating = [0]*len(sort_idx)
                 cnt = 0

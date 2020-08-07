@@ -395,11 +395,11 @@ class BiLSTM_Beta(nn.Module):
         if self.bidirect:
             self.get_score = nn.Sequential(
                 nn.Linear(self.hidden_dim*2, self.params, bias=True),
-                nn.ReLU())                           # can't use softmax because alpha/beta params can be > 1!
+                nn.Softmax())                           # can't use softmax because alpha/beta params can be > 1!
         else:
             self.get_score = nn.Sequential(
                 nn.Linear(self.hidden_dim, self.params, bias=True),
-                nn.ReLU())                           # can't use softmax because alpha/beta params can be > 1!
+                nn.Softmax())                           # can't use softmax because alpha/beta params can be > 1!
 
     def forward(self, x, batch_size, seq_lens):
         """

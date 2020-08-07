@@ -273,7 +273,7 @@ def main():
     if os.path.isfile(NUMPY_PATH):
         print(NUMPY_PATH)
         word_embs_np = np.load(NUMPY_PATH)
-        print("line 254: ", word_embs_np.shape)
+        # print("line 254: ", word_embs_np.shape)
         len_np = np.load(LENGTH_PATH)
         sl = len_np.tolist()
         word_embs_stack = torch.from_numpy(word_embs_np)
