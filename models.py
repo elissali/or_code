@@ -294,8 +294,9 @@ class RatingModel(object):
 
             # validation
             if X_val is not None:
-                # print("X_val not None: ", X_val)
+                # print("X_val not None: ", X_val)                          # these are the word embeddings
                 val_loss, val_r = self.validation(X_val, y_val, L_val)
+                # print("X_val not None: ", val_loss)                         
                 self.RNet.train()   # reset to train mode
                 if val_r > self.best_val_r:
                     self.best_val_r = val_r
@@ -306,7 +307,7 @@ class RatingModel(object):
                 self.val_loss_history.append(val_loss)
                 self.val_r_history.append(val_r)
             else:
-                # print("X_val is None: ", X_val)
+                print("X_val is None: ", X_val)
                 val_loss = 0
                 val_r = 0
             self.train_loss_history.append(total_loss)
@@ -368,18 +369,23 @@ class RatingModel(object):
                     output_scores, _ = self.RNet(X_batch)
                 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
-                    loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks; this is batch loss
+                    loss = self.loss_func(output_scores.log(), y_batch)                             # needs to be log because KLDiv sucks; this is batch loss
                 elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-                    print("TYPE: ", type(output_scores[:,0]))
-                    output_distrib = Beta(output_scores[:,0], output_scores[:,1])
-                    y_distrib = Beta(y_batch[:,0], y_batch[:,1])
-                    loss = self.loss_func(output_distrib, y_distrib).mean() 
+                    alpha_scores = torch.Tensor(output_scores[:,0] + 1e-5)
+                    beta_scores = torch.Tensor(output_scores[:,1] + 1e-5)
+                    output_distrib = Beta(alpha_scores, beta_scores)
+                    # output_distrib = Beta(output_scores[:,0], output_scores[:,1])
+                    alpha_y = torch.Tensor(y_batch[:,0] + 1e-5)
+                    beta_y = torch.Tensor(y_batch[:,1] + 1e-5)
+                    y_distrib = Beta(alpha_y, beta_y)
+                    # y_distrib = Beta(y_batch[:,0], y_batch[:,1])
+                    loss = self.loss_func(output_distrib, y_distrib).mean()                         
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
                 
-                total_val_loss += loss.item()
+                total_val_loss += loss.item()                                                       
                 output_scores = output_scores.data.tolist()
-                print("output_scores: ", output_scores)
+                # print("output_scores: ", output_scores)
 
                 temp_rating = [0]*len(sort_idx)
                 cnt = 0
