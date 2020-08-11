@@ -265,12 +265,12 @@ class RatingModel(object):
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv 
                 elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-                    alpha_scores = output_scores[:,0] + 1e-5
-                    beta_scores = output_scores[:,1] + 1e-5
+                    alpha_scores = torch.Tensor(output_scores[:,0] + 1e-5)
+                    beta_scores = torch.Tensor(output_scores[:,1] + 1e-5)
                     output_distrib = Beta(alpha_scores, beta_scores)
                     # output_distrib = Beta(output_scores[:,0], output_scores[:,1])
-                    alpha_y = y_batch[:,0] + 1e-5
-                    beta_y = y_batch[:,1] + 1e-5
+                    alpha_y = torch.Tensor(y_batch[:,0] + 1e-5)
+                    beta_y = torch.Tensor(y_batch[:,1] + 1e-5)
                     y_distrib = Beta(alpha_y, beta_y)
                     # y_distrib = Beta(y_batch[:,0], y_batch[:,1])
                     loss = self.loss_func(output_distrib, y_distrib).mean()
@@ -370,6 +370,7 @@ class RatingModel(object):
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv sucks; this is batch loss
                 elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
+                    print("TYPE: ", type(output_scores[:,0]))
                     output_distrib = Beta(output_scores[:,0], output_scores[:,1])
                     y_distrib = Beta(y_batch[:,0], y_batch[:,1])
                     loss = self.loss_func(output_distrib, y_distrib).mean() 
