@@ -20,6 +20,8 @@ from torch.utils.data.sampler import SequentialSampler, BatchSampler, RandomSamp
 from torch.nn.utils import clip_grad_value_
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.distributions import Beta
+from torch.distributions.mixture_same_family import MixtureSameFamily
+from torch import distributions as D 
 
 from utils import mkdir_p, weights_init, save_model
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -93,7 +95,7 @@ class RatingModel(object):
                 # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  KLDivLoss() requires first arg to be log probs
         elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
             self.loss_func = nn.MSELoss()
-        elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
+        elif self.cfg.PREDICTION_TYPE == 'beta_distrib' or self.cfg.PREDICTION_TYPE == 'mixed_gauss':
             self.loss_func = torch.distributions.kl_divergence 
                 # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
 
@@ -119,7 +121,7 @@ class RatingModel(object):
 
     def load_network(self):
         """Initialize the network or load from checkpoint"""
-        from net import RateNet, RateNet2D, BiLSTM, BiLSTMAttn, BiLSTM_Disc, BiLSTMAttn_Disc, BiLSTM_Beta, BiLSTMAttn_Beta
+        from net import RateNet, RateNet2D, BiLSTM, BiLSTMAttn, BiLSTM_Disc, BiLSTMAttn_Disc, BiLSTM_Beta, BiLSTMAttn_Beta, BiLSTM_Mixed, BiLSTMAttn_Mixed
         logging.info('initializing neural net')
 
         self.RNet = None
@@ -151,6 +153,13 @@ class RatingModel(object):
                                         self.drop_prob, self.dropout,
                                         self.cfg.LSTM.BIDIRECTION,
                                         self.cfg.CUDA)
+                elif self.cfg.PREDICTION_TYPE == "mixed_gauss":                                                # if predicting mixed gaussian parameters
+                    self.RNet = BiLSTMAttn_Mixed(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                        self.cfg.LSTM.HIDDEN_DIM,
+                                        self.cfg.LSTM.LAYERS,
+                                        self.drop_prob, self.dropout,
+                                        self.cfg.LSTM.BIDIRECTION,
+                                        self.cfg.CUDA)
             else:                                                                       # if using an LSTM with no attention
                 if self.cfg.PREDICTION_TYPE == "rating":                                # if predicting mean rating
                     self.RNet = BiLSTM(vec_dim, self.cfg.LSTM.SEQ_LEN,
@@ -166,6 +175,12 @@ class RatingModel(object):
                                     self.cfg.LSTM.BIDIRECTION, self.cfg.CUDA)
                 elif self.cfg.PREDICTION_TYPE == "beta_distrib" or self.cfg.PREDICTION_TYPE == "mean_var":
                     self.RNet = BiLSTM_Beta(vec_dim, self.cfg.LSTM.SEQ_LEN,
+                                    self.cfg.LSTM.HIDDEN_DIM,
+                                    self.cfg.LSTM.LAYERS,
+                                    self.drop_prob, self.dropout,
+                                    self.cfg.LSTM.BIDIRECTION, self.cfg.CUDA)
+                elif self.cfg.PREDICTION_TYPE == "mixed_gauss":
+                    self.RNet = BiLSTM_Mixed(vec_dim, self.cfg.LSTM.SEQ_LEN,
                                     self.cfg.LSTM.HIDDEN_DIM,
                                     self.cfg.LSTM.LAYERS,
                                     self.drop_prob, self.dropout,
@@ -196,7 +211,7 @@ class RatingModel(object):
         L_train, L_val = L["train"], L["val"]
         
         y_train = np.expand_dims(y_train, axis=1)       # shape = (696, 1, 7) if discrete_distrib
-        print("models.py ########################### y_train_shape should be (696, 1, 2): ", y_train.shape)
+        # print("models.py ########################### y_train_shape should be (696, 1, 2): ", y_train.shape)
 
         self.load_network()
         # gpu
@@ -259,7 +274,7 @@ class RatingModel(object):
                     output_scores, _ = self.RNet(pack, len(seq_lengths), seq_lengths)
                 else:
                     output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7]) if discrete distrib
-                # print(output_scores)                                    # TODO: output_scores returning mostly zeros
+                print("output_scores: ", output_scores)                                  
                 optimizer.zero_grad()                                   
 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
@@ -274,6 +289,9 @@ class RatingModel(object):
                     y_distrib = Beta(alpha_y, beta_y)
                     # y_distrib = Beta(y_batch[:,0], y_batch[:,1])
                     loss = self.loss_func(output_distrib, y_distrib).mean()
+                elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
+                    print("we got this far!")
+                    pass
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
