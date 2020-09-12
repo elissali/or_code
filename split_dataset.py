@@ -4,6 +4,7 @@ import random
 import os
 import re
 from scipy import stats 
+from sklearn import mixture
 
 import math
 import numpy as np
@@ -21,6 +22,7 @@ sentence_orig = the original sentence
 Sentence_BNB = the original sentence with "but not both" inserted
 '''
 
+###### DISCRETE DISTRIBUTION ######
 
 def get_distrib(array, buckets):
     distrib = np.zeros(buckets)
@@ -36,6 +38,19 @@ def get_distrib_dict(ratings_list, buckets):
         distrib_dict[tgrep] = get_distrib(ratings_list[tgrep], buckets)
     return distrib_dict
 
+###### MIXED GAUSSIAN DISTRIBUTION ######
+
+def get_mixture(scores_dict):
+    model = mixture.GaussianMixture(n_components=2)
+    mixed_means = dict()
+    mixed_stdevs = dict()
+    for i, tgrep in enumerate(scores_dict.keys()):
+        array = np.array(scores_dict[tgrep], dtype=np.float32)
+        fitted_model = model.fit(array.reshape(-1, 1))
+        mixed_means[tgrep] = fitted_model.means_.flatten()
+        cov = fitted_model.covariances_
+        mixed_stdevs[tgrep] = [ np.sqrt(  np.trace(cov[i])/2) for i in range(0,2) ]
+    return mixed_means, mixed_stdevs 
 
 
 def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, test_pct = 0.3):
@@ -62,6 +77,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)          # discretize raw ratings
     ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
     dict_discrete_distrib = get_distrib_dict(ratings_list, buckets)                         # {tgrep.id : [7-bucket distribution]}
+    dict_mixed_means, dict_mixed_stdevs = get_mixture(dict_raw_distrib)                     # {tgrep.id : [mean1, mean2]}  ;  {tgrep.id : [stdev1, stdev2]} - see or-scratchpad-8
 
     assert len(dict_discrete_distrib) == len(dict_id_to_sentence)
 
@@ -76,10 +92,12 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
             # var = str(dict_sentence_var[key])
             var = str(np.var(dict_raw_distrib[key]))
             alpha, beta = dict_beta[key]                                                # this is a duplicate of the following row (kinda)
-            params = str(dict_beta[key]).replace(",", " ")                              # dunno whether I want alpha/beta in one tuple, or separated
-            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' + params + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
+            beta_params = str(dict_beta[key]).replace(",", " ")                         # dunno whether I want alpha/beta in one tuple, or separated
+            mixed_means = str(dict_mixed_means[key]).replace(",", " ")
+            mixed_stds = str(dict_mixed_stdevs[key]).replace(",", " ")
+            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' + beta_params + ',' + mixed_means + ',' + mixed_stds + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
             big_list.append(example)
-                # big_list is a list of strings formatted: 'tgrep.id, mean, var, alpha, beta, raw_distrib, discrete_distrib, sentence'
+                # big_list is a list of strings formatted: 'tgrep.id, mean, var, alpha, beta, beta_params, mixed_means, mixed_stds, raw_distrib, discrete_distrib, sentence'
 
     # 2. split dataset into test and training
 
@@ -92,7 +110,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     test_ids = ids[num_train:]      # testing examples = what's left over, by index in big_list
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Var,Alpha,Beta,Params,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Var,Alpha,Beta,Beta_Params,Mixed_Means,Mixed_Stds,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
