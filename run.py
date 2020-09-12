@@ -34,7 +34,7 @@ cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
 cfg.MODE = 'train'                                  # remember to change to 'test' vs. 'train'
-cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mean_var'
+cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mean_var', 'mixed_gauss'
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
 cfg.OUT_PATH = './'
@@ -124,13 +124,34 @@ def load_dataset(input1, t):
     dict_item_sentence_raw = input_df[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
 
     if t == 'beta_distrib':
-        dict_params = input_df[['Item', 'Params']].groupby('Item')['Params'].apply(list)
+        dict_params = input_df[['Item', 'Beta_Params']].groupby('Item')['Beta_Params'].apply(list)
         dict_alpha = input_df[['Item', 'Alpha']].groupby('Item')['Alpha'].apply(float)
         dict_beta = input_df[['Item', 'Beta']].groupby('Item')['Beta'].apply(float)
         dict_item_params = dict()
         dict_item_sentence = dict()
         for (k, v) in dict_params.items():
             dict_item_params[k] = [dict_alpha[k], dict_beta[k]]
+            dict_item_sentence[k] = dict_item_sentence_raw[k]
+        return dict_item_params, dict_item_sentence
+    
+    if t == 'mixed_gauss':
+        dict_means = input_df[['Item', 'Mixed_Means']].groupby('Item')['Mixed_Means'].apply(list)
+        dict_stds = input_df[['Item', 'Mixed_Stds']].groupby('Item')['Mixed_Stds'].apply(list)
+        dict_item_params = dict()
+        dict_item_sentence = dict()
+
+        def helper(k, v):
+            v = v[0]
+            v = v.strip(']')
+            v = v.strip('[')
+            v = v.split()        
+            v = [float(i) for i in v]
+            return v
+
+        for (k, means) in dict_means.items():
+            means = helper(k, means)
+            stds = helper(k, dict_stds[k])
+            dict_item_params[k] = [means, stds]                         # {tgrep : [[mean1, mean2], [std1, std2]]}
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_params, dict_item_sentence
 
@@ -361,9 +382,10 @@ def main():
             for (k,v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))       # (871, 2)
-                # alpha = float(v[0])
-                # beta = float(v[1])
-                # normalized_labels.append(Beta(torch.tensor(alpha), torch.tensor(beta)))
+        elif cfg.PREDICTION_TYPE == "mixed_gauss":
+            for (k, v) in labels.items():                           # {tgrep : [[mean1, mean2], [std1, std2]]}
+                keys.append(k)
+                normalized_labels.append(v)                         # [[mean1, mean2], [std1, std2]]
 
 
 
