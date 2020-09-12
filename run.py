@@ -385,7 +385,8 @@ def main():
         elif cfg.PREDICTION_TYPE == "mixed_gauss":
             for (k, v) in labels.items():                           # {tgrep : [[mean1, mean2], [std1, std2]]}
                 keys.append(k)
-                normalized_labels.append(v)                         # [[mean1, mean2], [std1, std2]]
+                flat_v = [item for sublist in v for item in sublist]
+                normalized_labels.append(flat_v)                    # [mean1, mean2, std1, std2]
 
 
 
