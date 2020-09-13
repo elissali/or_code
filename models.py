@@ -91,13 +91,18 @@ class RatingModel(object):
         self.interval = self.cfg.TRAIN.INTERVAL
         
         if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
-            self.loss_func = nn.KLDivLoss()               # nn.KLDivLoss()
-                # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  KLDivLoss() requires first arg to be log probs
+            self.loss_func = nn.KLDivLoss()              
+                # https://discuss.pytorch.org/t/kl-divergence-produces-negative-values/16791/6  
+                # KLDivLoss() requires first arg to be log probs
         elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
             self.loss_func = nn.MSELoss()
-        elif self.cfg.PREDICTION_TYPE == 'beta_distrib' or self.cfg.PREDICTION_TYPE == 'mixed_gauss':
+        elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
             self.loss_func = torch.distributions.kl_divergence 
                 # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
+                # https://stackoverflow.com/questions/49886369/kl-divergence-for-two-probability-distributions-in-pytorch/52484046
+        elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
+            self.loss_func = # torch.distributions.kl_divergence
+            # TODO: need loss function - kl_divergence monte carlo approximation?
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -255,7 +260,7 @@ class RatingModel(object):
                 y_batch = y_batch[sort_idx]
                 if self.cfg.PREDICTION_TYPE == "discrete_distrib" or self.cfg.PREDICTION_TYPE == "mean_var":
                     y_batch = torch.from_numpy(y_batch).float().squeeze()       # torch.Size([32, 7]) = (batch_size, distrib_dim) if discrete distrib
-                elif self.cfg.PREDICTION_TYPE == "beta_distrib":
+                elif self.cfg.PREDICTION_TYPE == "beta_distrib" or self.cfg.PREDICTION_TYPE == "mixed_gauss":
                     y_batch = torch.from_numpy(y_batch).float().squeeze()
                 elif self.cfg.PREDICTION_TYPE == "rating":
                     y_batch = torch.from_numpy(y_batch).float()
@@ -273,7 +278,7 @@ class RatingModel(object):
                                                 batch_first=True)
                     output_scores, _ = self.RNet(pack, len(seq_lengths), seq_lengths)
                 else:
-                    output_scores, _ = self.RNet(X_batch)               # output_scores needs to be torch.Size([32, 7]) if discrete distrib
+                    output_scores, _ = self.RNet(X_batch)                   # output_scores needs to be torch.Size([32, 7]) if discrete distrib
                 print("output_scores: ", output_scores)                                  
                 optimizer.zero_grad()                                   
 
@@ -291,7 +296,18 @@ class RatingModel(object):
                     loss = self.loss_func(output_distrib, y_distrib).mean()
                 elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
                     print("we got this far!")
-                    pass
+                    # print("output_scores: ", output_scores.shape)
+                    means = torch.Tensor(output_scores[:,0:2])
+                    stds = torch.Tensor(output_scores[:,2:4])
+                    comp = D.Normal(means, stds)
+                    mix = D.Categorical(torch.ones(2,))
+                    gmm = MixtureSameFamily(mix, comp)
+                    means_y = torch.Tensor(y_batch[:,0:2])
+                    stds_y = torch.Tensor(y_batch[:,2:4])
+                    comp_y = D.Normal(means_y, stds_y)
+                    mix_y = D.Categorical(torch.ones(2,))       # does this need to be (batch_size, 2,)?
+                    gmm_y = MixtureSameFamily(mix_y, comp_y)
+                    loss = self.loss_func(gmm, gmm_y).mean()
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
