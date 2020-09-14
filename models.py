@@ -101,8 +101,12 @@ class RatingModel(object):
                 # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
                 # https://stackoverflow.com/questions/49886369/kl-divergence-for-two-probability-distributions-in-pytorch/52484046
         elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-            self.loss_func = # torch.distributions.kl_divergence
-            # TODO: need loss function - kl_divergence monte carlo approximation?
+            def gmm_kl(gmm_p, gmm_q, n_samples=10**5):  # monte carlo approximation of kl div
+                X = gmm_p.sample_n(n_samples)           # sample from first gmm a bunch of times: (batch_size, n_samples)
+                log_p_X = gmm_p.log_prob(X)             # weighted log prob for samples in first gmm: (batch_size, n_samples)
+                log_q_X = gmm_q.log_prob(X)             # weighted log prob for samples in second gmm: (batch_size, n_samples)
+                return log_p_X.mean() - log_q_X.mean()  # difference between average log probs for each gmm 
+            self.loss_func = gmm_kl
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -279,7 +283,7 @@ class RatingModel(object):
                     output_scores, _ = self.RNet(pack, len(seq_lengths), seq_lengths)
                 else:
                     output_scores, _ = self.RNet(X_batch)                   # output_scores needs to be torch.Size([32, 7]) if discrete distrib
-                print("output_scores: ", output_scores)                                  
+                # print("output_scores: ", output_scores)                                  
                 optimizer.zero_grad()                                   
 
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
@@ -300,14 +304,17 @@ class RatingModel(object):
                     means = torch.Tensor(output_scores[:,0:2])
                     stds = torch.Tensor(output_scores[:,2:4])
                     comp = D.Normal(means, stds)
-                    mix = D.Categorical(torch.ones(2,))
+                    dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
+                    mix = D.Categorical(torch.ones(dim,2))
+                    # print("comp: ", comp)
+                    # print("mix: ", mix)
                     gmm = MixtureSameFamily(mix, comp)
                     means_y = torch.Tensor(y_batch[:,0:2])
                     stds_y = torch.Tensor(y_batch[:,2:4])
                     comp_y = D.Normal(means_y, stds_y)
-                    mix_y = D.Categorical(torch.ones(2,))       # does this need to be (batch_size, 2,)?
+                    mix_y = D.Categorical(torch.ones(dim,2))         
                     gmm_y = MixtureSameFamily(mix_y, comp_y)
-                    loss = self.loss_func(gmm, gmm_y).mean()
+                    loss = self.loss_func(gmm, gmm_y)
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
@@ -416,6 +423,23 @@ class RatingModel(object):
                     loss = self.loss_func(output_distrib, y_distrib).mean()                         
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
+                elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
+                    print("we got this far!")
+                    # print("output_scores: ", output_scores.shape)
+                    means = torch.Tensor(output_scores[:,0:2])
+                    stds = torch.Tensor(output_scores[:,2:4])
+                    comp = D.Normal(means, stds)
+                    dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
+                    mix = D.Categorical(torch.ones(dim,2))
+                    # print("comp: ", comp)
+                    # print("mix: ", mix)
+                    gmm = MixtureSameFamily(mix, comp)
+                    means_y = torch.Tensor(y_batch[:,0:2])
+                    stds_y = torch.Tensor(y_batch[:,2:4])
+                    comp_y = D.Normal(means_y, stds_y)
+                    mix_y = D.Categorical(torch.ones(dim,2))         
+                    gmm_y = MixtureSameFamily(mix_y, comp_y)
+                    loss = self.loss_func(gmm, gmm_y)
                 
                 total_val_loss += loss.item()                                                       
                 output_scores = output_scores.data.tolist()
