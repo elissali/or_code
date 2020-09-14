@@ -461,7 +461,7 @@ class RatingModel(object):
         
         if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
             val_coeff = np.mean([np.corrcoef(i, j)[0,1] for i, j in zip(np.array(y_preds_lst), np.array(y_val))])
-        
+    
         elif self.cfg.PREDICTION_TYPE == 'beta_distrib' or self.cfg.PREDICTION_TYPE == 'mean_var':
             alpha_preds = [preds[0] for preds in np.array(y_preds_lst)]
             alpha_val = [val[0] for val in np.array(y_val)]
@@ -473,7 +473,10 @@ class RatingModel(object):
             val_coeff = np.mean([alpha_coeff, beta_coeff])
             
         elif self.cfg.PREDICTION_TYPE == 'rating':
-            val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]        
+            val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]     
+
+        elif self.PREDICTION_TYPE == 'mixed_gauss':
+            pass   
 
         return total_val_loss, val_coeff
 
