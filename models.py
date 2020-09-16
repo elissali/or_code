@@ -101,12 +101,16 @@ class RatingModel(object):
                 # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
                 # https://stackoverflow.com/questions/49886369/kl-divergence-for-two-probability-distributions-in-pytorch/52484046
         elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-            def gmm_kl(gmm_p, gmm_q, n_samples=10**5):  # monte carlo approximation of kl div
-                X = gmm_p.sample_n(n_samples)           # sample from first gmm a bunch of times: (batch_size, n_samples)
-                log_p_X = gmm_p.log_prob(X)             # weighted log prob for samples in first gmm: (batch_size, n_samples)
-                log_q_X = gmm_q.log_prob(X)             # weighted log prob for samples in second gmm: (batch_size, n_samples)
-                return log_p_X.mean() - log_q_X.mean()  # difference between average log probs for each gmm 
-            self.loss_func = gmm_kl
+            def monte_carlo_kl(gmm_p, gmm_q, n_samples=10**5):  # monte carlo approximation of kl div
+                X = gmm_p.sample_n(n_samples)                   # sample from first gmm a bunch of times: (batch_size, n_samples)
+                log_p_X = gmm_p.log_prob(X)                     # weighted log prob for samples in first gmm: (batch_size, n_samples)
+                log_q_X = gmm_q.log_prob(X)                     # weighted log prob for samples in second gmm: (batch_size, n_samples)
+                return log_p_X.mean() - log_q_X.mean()          # difference between average log probs for each gmm 
+            def gnll_loss(y, mix, comp):
+                gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
+                log_likelihood = gmm.log_prob(torch.Tensor(y.reshape(-1,1)))
+                return -1*torch.mean(log_likelihood)
+            self.loss_func = gnll_loss
 
         self.train_loss_history = []
         self.val_loss_history = []
@@ -306,15 +310,7 @@ class RatingModel(object):
                     comp = D.Normal(means, stds)
                     dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
                     mix = D.Categorical(torch.ones(dim,2))
-                    # print("comp: ", comp)
-                    # print("mix: ", mix)
-                    gmm = MixtureSameFamily(mix, comp)
-                    means_y = torch.Tensor(y_batch[:,0:2])
-                    stds_y = torch.Tensor(y_batch[:,2:4])
-                    comp_y = D.Normal(means_y, stds_y)
-                    mix_y = D.Categorical(torch.ones(dim,2))         
-                    gmm_y = MixtureSameFamily(mix_y, comp_y)
-                    loss = self.loss_func(gmm, gmm_y)
+                    loss = self.loss_func(y_batch, mix, comp)
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
@@ -431,15 +427,8 @@ class RatingModel(object):
                     comp = D.Normal(means, stds)
                     dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
                     mix = D.Categorical(torch.ones(dim,2))
-                    # print("comp: ", comp)
-                    # print("mix: ", mix)
-                    gmm = MixtureSameFamily(mix, comp)
-                    means_y = torch.Tensor(y_batch[:,0:2])
-                    stds_y = torch.Tensor(y_batch[:,2:4])
-                    comp_y = D.Normal(means_y, stds_y)
-                    mix_y = D.Categorical(torch.ones(dim,2))         
-                    gmm_y = MixtureSameFamily(mix_y, comp_y)
-                    loss = self.loss_func(gmm, gmm_y)
+                    loss = self.loss_func(y_batch, mix, comp)
+                    print("loss: ",loss)
                 
                 total_val_loss += loss.item()                                                       
                 output_scores = output_scores.data.tolist()
@@ -475,7 +464,7 @@ class RatingModel(object):
         elif self.cfg.PREDICTION_TYPE == 'rating':
             val_coeff = np.corrcoef(np.array(y_preds_lst), np.array(y_val))[0, 1]     
 
-        elif self.PREDICTION_TYPE == 'mixed_gauss':
+        elif self.PREDICTION_TYPE == 'mixed_gauss':         # TODO: fill this out!
             pass   
 
         return total_val_loss, val_coeff
