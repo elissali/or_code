@@ -101,15 +101,18 @@ class RatingModel(object):
                 # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
                 # https://stackoverflow.com/questions/49886369/kl-divergence-for-two-probability-distributions-in-pytorch/52484046
         elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-            def monte_carlo_kl(gmm_p, gmm_q, n_samples=10**5):  # monte carlo approximation of kl div
-                X = gmm_p.sample_n(n_samples)                   # sample from first gmm a bunch of times: (batch_size, n_samples)
-                log_p_X = gmm_p.log_prob(X)                     # weighted log prob for samples in first gmm: (batch_size, n_samples)
-                log_q_X = gmm_q.log_prob(X)                     # weighted log prob for samples in second gmm: (batch_size, n_samples)
-                return log_p_X.mean() - log_q_X.mean()          # difference between average log probs for each gmm 
-            def gnll_loss(y, mix, comp):
+            def gnll_loss(y, mix, comp, batched=True):
                 gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
-                log_likelihood = gmm.log_prob(torch.Tensor(y.reshape(-1,1)))
-                return -1*torch.mean(log_likelihood)
+                if batched == False:
+                    log_likelihood = gmm.log_prob(torch.Tensor(y.reshape(-1,1)))
+                    return -1*torch.mean(log_likelihood)     
+                else:
+                    batch_size = y.shape[0]
+                    loss = 0
+                    for i in range(batch_size):
+                        log_likelihood = gmm.log_prob(torch.Tensor(y)[i].reshape(-1,1))[:,i]
+                        loss -= torch.mean(log_likelihood)
+                    return loss 
             self.loss_func = gnll_loss
 
         self.train_loss_history = []
@@ -271,8 +274,7 @@ class RatingModel(object):
                 elif self.cfg.PREDICTION_TYPE == "beta_distrib" or self.cfg.PREDICTION_TYPE == "mixed_gauss":
                     y_batch = torch.from_numpy(y_batch).float().squeeze()
                 elif self.cfg.PREDICTION_TYPE == "rating":
-                    y_batch = torch.from_numpy(y_batch).float()
-                # print(y_batch.shape)
+                    y_batch = torch.from_numpy(y_batch).float()                 # torch.Size([32, 9]) = (batch_size, distrib_dim)
 
                 if self.cfg.CUDA:
                     X_batch = X_batch.cuda()
@@ -305,8 +307,8 @@ class RatingModel(object):
                 elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
                     print("we got this far!")
                     # print("output_scores: ", output_scores.shape)
-                    means = torch.Tensor(output_scores[:,0:2])
-                    stds = torch.Tensor(output_scores[:,2:4])
+                    means = torch.Tensor(output_scores[:,0:2])      # (batch_size, 2)
+                    stds = torch.Tensor(output_scores[:,2:4])       # (batch_size, 2)
                     comp = D.Normal(means, stds)
                     dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
                     mix = D.Categorical(torch.ones(dim,2))
