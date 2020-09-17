@@ -135,12 +135,13 @@ def load_dataset(input1, t):
         return dict_item_params, dict_item_sentence
     
     if t == 'mixed_gauss':
-        dict_means = input_df[['Item', 'Mixed_Means']].groupby('Item')['Mixed_Means'].apply(list)
-        dict_stds = input_df[['Item', 'Mixed_Stds']].groupby('Item')['Mixed_Stds'].apply(list)
-        dict_item_params = dict()
+        # dict_means = input_df[['Item', 'Mixed_Means']].groupby('Item')['Mixed_Means'].apply(list)
+        # dict_stds = input_df[['Item', 'Mixed_Stds']].groupby('Item')['Mixed_Stds'].apply(list)
+        dict_raws = input_df[['Item', 'Raw_Distrib']].groupby('Item')['Raw_Distrib'].apply(list)
+        dict_item_scores = dict()
         dict_item_sentence = dict()
 
-        def helper(k, v):
+        def helper(v):
             v = v[0]
             v = v.strip(']')
             v = v.strip('[')
@@ -148,12 +149,13 @@ def load_dataset(input1, t):
             v = [float(i) for i in v]
             return v
 
-        for (k, means) in dict_means.items():
-            means = helper(k, means)
-            stds = helper(k, dict_stds[k])
-            dict_item_params[k] = [means, stds]                         # {tgrep : [[mean1, mean2], [std1, std2]]}
+        for (k, raw) in dict_raws.items():
+            # means = helper(k, means)
+            # stds = helper(k, dict_stds[k])
+            # dict_item_params[k] = [means, stds]                         # {tgrep : [[mean1, mean2], [std1, std2]]}
+            dict_item_scores[k] = helper(raw)[:9]                         # cut it off at 9, since these are inconsistent lengths
             dict_item_sentence[k] = dict_item_sentence_raw[k]
-        return dict_item_params, dict_item_sentence
+        return dict_item_scores, dict_item_sentence
 
     elif t == 'mean_var':
         dict_mean = input_df[['Item', 'Mean']].groupby('Item')['Mean'].apply(float)
@@ -373,7 +375,7 @@ def main():
         if cfg.PREDICTION_TYPE == "discrete_distrib" or cfg.PREDICTION_TYPE == "mean_var":
             for (k, v) in labels.items():
                 keys.append(k)
-                normalized_labels.append(list(map(float, v)))
+                normalized_labels.append(list(map(float, v)))           # (871, 7)
         elif cfg.PREDICTION_TYPE == "rating":
             for (k, v) in labels.items():
                 keys.append(k)
@@ -381,13 +383,13 @@ def main():
         elif cfg.PREDICTION_TYPE == "beta_distrib":
             for (k,v) in labels.items():
                 keys.append(k)
-                normalized_labels.append(list(map(float, v)))       # (871, 2)
+                normalized_labels.append(list(map(float, v)))           # (871, 2)
         elif cfg.PREDICTION_TYPE == "mixed_gauss":
-            for (k, v) in labels.items():                           # {tgrep : [[mean1, mean2], [std1, std2]]}
+            for (k, v) in labels.items():                           
                 keys.append(k)
-                flat_v = [item for sublist in v for item in sublist]
-                normalized_labels.append(flat_v)                    # [mean1, mean2, std1, std2]
-
+                normalized_labels.append(list(map(float, v)))           # (871, 9)
+                # flat_v = [item for sublist in v for item in sublist]
+                # normalized_labels.append(flat_v)                      # [mean1, mean2, std1, std2]
 
 
     ##################################### TRAINING #######################################
