@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+
 from torch.distributions import Beta
 
 
@@ -510,6 +511,24 @@ class BiLSTMAttn_Beta(nn.Module):
         return self.get_score(x), attn_weights
 
 ################ MIXED GAUSSIAN DISTRIB MODEL #######################
+
+### Custom ELU ### 
+class ELU_1(nn.Module):
+    
+    __constants__ = ['alpha', 'inplace']
+    alpha: float
+    inplace: bool
+
+    def __init__(self, alpha: float = 1., inplace: bool = False) -> None:
+        super(ELU_1, self).__init__()
+        self.alpha = alpha
+        self.inplace = inplace
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        return torch.nn.functional.elu(input, self.alpha, self.inplace) + 1 
+
+
+
 # (Bi-)LSTM model
 class BiLSTM_Mixed(nn.Module):
     """
@@ -533,7 +552,7 @@ class BiLSTM_Mixed(nn.Module):
         self.define_module()
 
     def define_module(self):
-        self.params = 4
+        self.params = 2             # this becomes =2, since 2 params per tensor 
         self.lstm = nn.LSTM(self.vec_dim,
                             self.hidden_dim,
                             self.num_layers,
@@ -541,15 +560,25 @@ class BiLSTM_Mixed(nn.Module):
                             dropout=self.drop_prob,
                             bidirectional=self.bidirect)
         if self.bidirect:
-            self.get_score = nn.Sequential(
-                nn.Linear(self.hidden_dim*2, self.params, bias=True),
-                nn.Softmax())                             
-        else:
-            self.get_score = nn.Sequential(
-                nn.Linear(self.hidden_dim, self.params, bias=True),
-                nn.Softmax())                             
 
-    def forward(self, x, batch_size, seq_lens):
+            self.means = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.params, bias=True),
+                nn.Sigmoid())
+
+            self.stds = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.params, bias=True),
+                ELU_1())
+
+        else:
+            self.means = nn.Sequential(
+                nn.Linear(self.hidden_dim, self.params, bias=True),
+                nn.Sigmoid())
+
+            self.stds = nn.Sequential(
+                nn.Linear(self.hidden_dim, self.params, bias=True),
+                ELU_1())                         
+
+    def forward(self, x, batch_size, seq_lens):                             # where x = the training batch (32,9)
         """
         x - Tensor shape (curr_batch_size, seq_len, input_size)
                 we need to permute the first and the second axis
@@ -584,7 +613,12 @@ class BiLSTM_Mixed(nn.Module):
             mask = mask.cuda()
         x = x * mask    # (batch_size, hidden_dim, max_seq_len)
         x = x.sum(dim=2)  # (batch_size, hidden_dim)
-        return self.get_score(x), None
+        
+        stds = self.stds(x)             # (32,2)
+        means = self.means(x)           # (32,2)
+        return torch.cat((means, stds), dim=1), None        # (32,4)
+
+        # return self.get_score(x), None
 
 
 class BiLSTMAttn_Mixed(nn.Module):
