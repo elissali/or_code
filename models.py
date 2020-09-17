@@ -101,17 +101,24 @@ class RatingModel(object):
                 # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
                 # https://stackoverflow.com/questions/49886369/kl-divergence-for-two-probability-distributions-in-pytorch/52484046
         elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-            def gnll_loss(y, mix, comp, batched=True):
-                gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
+            def gnll_loss(y, means, stds, batched=True):
                 if batched == False:
+                    comp = D.Normal(means, stds)
+                    dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
+                    mix = D.Categorical(torch.ones(dim,2))
+                    gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
                     log_likelihood = gmm.log_prob(torch.Tensor(y.reshape(-1,1)))
                     return -1*torch.mean(log_likelihood)     
                 else:
                     batch_size = y.shape[0]
                     loss = 0
                     for i in range(batch_size):
-                        log_likelihood = gmm.log_prob(torch.Tensor(y)[i].reshape(-1,1))[:,i]
-                        # print("gnll loss: ", torch.mean(log_likelihood))
+                        comp = D.Normal(means[i], stds[i])
+                        mix = D.Categorical(torch.ones(2))
+                        gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
+                        log_likelihood = gmm.log_prob(torch.Tensor(y)[i].reshape(-1,1))
+                        if torch.mean(log_likelihood) > 0:
+                            print("gnll loss: ", torch.mean(log_likelihood))
                         loss -= torch.mean(log_likelihood)
                     return loss 
             self.loss_func = gnll_loss
@@ -309,10 +316,10 @@ class RatingModel(object):
                     # print("output_scores: ", output_scores.shape)
                     means = torch.Tensor(output_scores[:,0:2])      # (batch_size, 2)
                     stds = torch.Tensor(output_scores[:,2:4])       # (batch_size, 2)
-                    comp = D.Normal(means, stds)
-                    dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
-                    mix = D.Categorical(torch.ones(dim,2))
-                    loss = self.loss_func(y_batch, mix, comp)
+                    # comp = D.Normal(means, stds)
+                    # dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
+                    # mix = D.Categorical(torch.ones(dim,2))
+                    loss = self.loss_func(y_batch, means, stds)
                     print("loss: ", loss)
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
@@ -426,10 +433,10 @@ class RatingModel(object):
                     # print("output_scores: ", output_scores.shape)
                     means = torch.Tensor(output_scores[:,0:2])
                     stds = torch.Tensor(output_scores[:,2:4])
-                    comp = D.Normal(means, stds)
-                    dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
-                    mix = D.Categorical(torch.ones(dim,2))
-                    loss = self.loss_func(y_batch, mix, comp)
+                    # comp = D.Normal(means, stds)
+                    # dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
+                    # mix = D.Categorical(torch.ones(dim,2))
+                    loss = self.loss_func(y_batch, means, stds)
                 
                 total_val_loss += loss.item()                                                       
                 output_scores = output_scores.data.tolist()
