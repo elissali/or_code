@@ -117,10 +117,10 @@ class RatingModel(object):
                         mix = D.Categorical(torch.ones(2))
                         gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
                         log_likelihood = gmm.log_prob(torch.Tensor(y)[i].reshape(-1,1))
-                        if torch.mean(log_likelihood) > 0:
-                            print("gnll loss: ", torch.mean(log_likelihood))
+                        # if torch.mean(log_likelihood) > 0:
+                            # print("gnll loss: ", torch.mean(log_likelihood))
                         loss -= torch.mean(log_likelihood)
-                    return loss 
+                    return loss + 100
             self.loss_func = gnll_loss
 
         self.train_loss_history = []
@@ -320,7 +320,7 @@ class RatingModel(object):
                     # dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
                     # mix = D.Categorical(torch.ones(dim,2))
                     loss = self.loss_func(y_batch, means, stds)
-                    print("loss: ", loss)
+                    # print("loss: ", loss)
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
@@ -328,7 +328,7 @@ class RatingModel(object):
                 total_loss += loss.item()
                 loss.backward()
 
-                print("loss: ", loss)
+                # print("loss: ", loss)
 
                 clip_grad_value_(self.RNet.parameters(), 2)
                 optimizer.step()
