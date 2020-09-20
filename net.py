@@ -652,14 +652,25 @@ class BiLSTMAttn_Mixed(nn.Module):
                             bidirectional=self.bidirect)
         if self.bidirect:
             self.attention = SelfAttention(self.hidden_dim*2, self.is_gpu)
-            self.get_score = nn.Sequential(
+
+            self.means = nn.Sequential(
                 nn.Linear(self.hidden_dim*2, self.params, bias=True),
-                nn.Softmax())                              
+                nn.Sigmoid())
+
+            self.stds = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.params, bias=True),
+                ELU_1())
+
         else:
             self.attention = SelfAttention(self.hidden_dim, self.is_gpu)
-            self.get_score = nn.Sequential(
+
+            self.means = nn.Sequential(
                 nn.Linear(self.hidden_dim, self.params, bias=True),
-                nn.Softmax())                            
+                nn.Sigmoid())
+
+            self.stds = nn.Sequential(
+                nn.Linear(self.hidden_dim, self.params, bias=True),
+                ELU_1())                          
 
     def forward(self, x, batch_size, seq_lens):
         """
@@ -683,7 +694,12 @@ class BiLSTMAttn_Mixed(nn.Module):
         else:
             x = x.reshape(batch_size, seq_lens[0], self.hidden_dim)
         x, attn_weights = self.attention(x, seq_lens)
-        return self.get_score(x), attn_weights
+
+        stds = self.stds(x)             # (32,2)
+        means = self.means(x)           # (32,2)
+        
+        return torch.cat((means, stds), dim=1), attn_weights
+
 
 
 
