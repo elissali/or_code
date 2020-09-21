@@ -123,18 +123,18 @@ def load_dataset(input1, t):
     input_df = pd.read_csv(input1, sep=',')
     dict_item_sentence_raw = input_df[['Item', 'Sentence']].drop_duplicates().groupby('Item')['Sentence'].apply(list).to_dict()
 
-    if t == 'beta_distrib':
-        dict_params = input_df[['Item', 'Beta_Params']].groupby('Item')['Beta_Params'].apply(list)
-        dict_alpha = input_df[['Item', 'Alpha']].groupby('Item')['Alpha'].apply(float)
-        dict_beta = input_df[['Item', 'Beta']].groupby('Item')['Beta'].apply(float)
-        dict_item_params = dict()
-        dict_item_sentence = dict()
-        for (k, v) in dict_params.items():
-            dict_item_params[k] = [dict_alpha[k], dict_beta[k]]
-            dict_item_sentence[k] = dict_item_sentence_raw[k]
-        return dict_item_params, dict_item_sentence
+    # if t == 'beta_distrib':
+    #     dict_params = input_df[['Item', 'Beta_Params']].groupby('Item')['Beta_Params'].apply(list)
+    #     dict_alpha = input_df[['Item', 'Alpha']].groupby('Item')['Alpha'].apply(float)
+    #     dict_beta = input_df[['Item', 'Beta']].groupby('Item')['Beta'].apply(float)
+    #     dict_item_params = dict()
+    #     dict_item_sentence = dict()
+    #     for (k, v) in dict_params.items():
+    #         dict_item_params[k] = [dict_alpha[k], dict_beta[k]]
+    #         dict_item_sentence[k] = dict_item_sentence_raw[k]
+    #     return dict_item_params, dict_item_sentence
     
-    if t == 'mixed_gauss':
+    if t == 'mixed_gauss' or t == 'beta_distrib':
         # dict_means = input_df[['Item', 'Mixed_Means']].groupby('Item')['Mixed_Means'].apply(list)
         # dict_stds = input_df[['Item', 'Mixed_Stds']].groupby('Item')['Mixed_Stds'].apply(list)
         dict_raws = input_df[['Item', 'Raw_Distrib']].groupby('Item')['Raw_Distrib'].apply(list)

@@ -396,11 +396,11 @@ class BiLSTM_Beta(nn.Module):
         if self.bidirect:
             self.get_score = nn.Sequential(
                 nn.Linear(self.hidden_dim*2, self.params, bias=True),
-                nn.PReLU())                             # can't use softmax because alpha/beta params can be > 1!
+                ELU_1())                             # can't use softmax because alpha/beta params can be > 1!
         else:
             self.get_score = nn.Sequential(
                 nn.Linear(self.hidden_dim, self.params, bias=True),
-                nn.PReLU())                             # can't use softmax because alpha/beta params can be > 1!
+                ELU_1())                             # can't use softmax because alpha/beta params can be > 1!
                                                             # trying something that's not ReLU since ReLU keeps dying on me
 
     def forward(self, x, batch_size, seq_lens):
@@ -438,10 +438,8 @@ class BiLSTM_Beta(nn.Module):
             mask = mask.cuda()
         x = x * mask    # (batch_size, hidden_dim, max_seq_len)
         x = x.sum(dim=2)  # (batch_size, hidden_dim)
+
         return self.get_score(x), None
-        # print("LINE 439: SELF.GET_SCORE: ", self.get_score.size())
-        # (alpha, beta) = self.get_score(x)                                 # use get_score module to predict tuple
-        # return Beta(alpha, beta), None                                  # turn the tuple into a distribution object
 
 
 class BiLSTMAttn_Beta(nn.Module):
@@ -506,8 +504,7 @@ class BiLSTMAttn_Beta(nn.Module):
         else:
             x = x.reshape(batch_size, seq_lens[0], self.hidden_dim)
         x, attn_weights = self.attention(x, seq_lens)
-        # (alpha, beta) = self.get_score(x)                                 # get the (alpha, beta) tuple prediction
-        # return Beta(alpha, beta), attn_weights                          # return the distribution object that fits the (alpha, beta)
+
         return self.get_score(x), attn_weights
 
 ################ MIXED GAUSSIAN DISTRIB MODEL #######################
@@ -697,7 +694,7 @@ class BiLSTMAttn_Mixed(nn.Module):
 
         stds = self.stds(x)             # (32,2)
         means = self.means(x)           # (32,2)
-        
+
         return torch.cat((means, stds), dim=1), attn_weights
 
 
