@@ -566,12 +566,20 @@ class BiLSTM_Mixed(nn.Module):
                 nn.Linear(self.hidden_dim*2, self.params, bias=True),
                 ELU_1())
 
+            self.weights = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.params, bias=True),
+                ELU_1())
+
         else:
             self.means = nn.Sequential(
                 nn.Linear(self.hidden_dim, self.params, bias=True),
                 nn.Sigmoid())
 
             self.stds = nn.Sequential(
+                nn.Linear(self.hidden_dim, self.params, bias=True),
+                ELU_1())
+
+            self.weights = nn.Sequential(
                 nn.Linear(self.hidden_dim, self.params, bias=True),
                 ELU_1())                         
 
@@ -613,7 +621,8 @@ class BiLSTM_Mixed(nn.Module):
         
         stds = self.stds(x)             # (32,2)
         means = self.means(x)           # (32,2)
-        return torch.cat((means, stds), dim=1), None        # (32,4)
+        weights = self.weights(x)       # (32,2)
+        return torch.cat((means, stds, weights), dim=1), None        # (32,6)
 
         # return self.get_score(x), None
 
@@ -640,7 +649,7 @@ class BiLSTMAttn_Mixed(nn.Module):
         self.define_module()
 
     def define_module(self):
-        self.params = 4
+        self.params = 2
         self.lstm = nn.LSTM(self.vec_dim,
                             self.hidden_dim,
                             self.num_layers,
@@ -657,6 +666,10 @@ class BiLSTMAttn_Mixed(nn.Module):
             self.stds = nn.Sequential(
                 nn.Linear(self.hidden_dim*2, self.params, bias=True),
                 ELU_1())
+            
+            self.weights = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.params, bias=True),
+                ELU_1())
 
         else:
             self.attention = SelfAttention(self.hidden_dim, self.is_gpu)
@@ -667,7 +680,11 @@ class BiLSTMAttn_Mixed(nn.Module):
 
             self.stds = nn.Sequential(
                 nn.Linear(self.hidden_dim, self.params, bias=True),
-                ELU_1())                          
+                ELU_1())     
+
+            self.weights = nn.Sequential(
+                nn.Linear(self.hidden_dim, self.params, bias=True),
+                ELU_1())                       
 
     def forward(self, x, batch_size, seq_lens):
         """
@@ -694,8 +711,9 @@ class BiLSTMAttn_Mixed(nn.Module):
 
         stds = self.stds(x)             # (32,2)
         means = self.means(x)           # (32,2)
+        weights = self.weights(x)
 
-        return torch.cat((means, stds), dim=1), attn_weights
+        return torch.cat((means, stds, weights), dim=1), attn_weights
 
 
 
