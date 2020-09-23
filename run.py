@@ -389,7 +389,7 @@ def main():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))           # (871, 9)
                 # flat_v = [item for sublist in v for item in sublist]
-                # normalized_labels.append(flat_v)                      # [mean1, mean2, std1, std2]
+                # normalized_labels.append(flat_v)                      # [mean1, mean2, std1, std2, weight1, weight2]
 
 
     ##################################### TRAINING #######################################

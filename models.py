@@ -23,7 +23,7 @@ from torch.distributions import Beta
 from torch.distributions.mixture_same_family import MixtureSameFamily
 from torch import distributions as D 
 
-from utils import mkdir_p, weights_init, save_model
+from utils import mkdir_p, weights_init, save_model, norm
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
@@ -114,11 +114,11 @@ class RatingModel(object):
                 # https://discuss.pytorch.org/t/use-kl-divergence-as-loss-between-two-multivariate-gaussians/40865 
                 # https://stackoverflow.com/questions/49886369/kl-divergence-for-two-probability-distributions-in-pytorch/52484046
         elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-            def gnll_loss(y, means, stds, batched=True):
+            def gnll_loss(y, means, stds, weights, batched=True):
                 if batched == False:
                     comp = D.Normal(means, stds)
                     dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
-                    mix = D.Categorical(torch.ones(dim,2))
+                    mix = D.Categorical(weights)
                     gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
                     log_likelihood = gmm.log_prob(torch.Tensor(y.reshape(-1,1)))
                     print("gnll log likelihood: ", log_likelihood)
@@ -128,7 +128,7 @@ class RatingModel(object):
                     loss = 0
                     for i in range(batch_size):
                         comp = D.Normal(means[i], stds[i])
-                        mix = D.Categorical(torch.ones(2))
+                        mix = D.Categorical(weights[i])
                         gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
                         log_likelihood = gmm.log_prob(torch.Tensor(y)[i].reshape(-1,1))
                         # if torch.mean(log_likelihood) > 0:
@@ -320,17 +320,11 @@ class RatingModel(object):
                     alpha_scores = torch.Tensor(output_scores[:,0] + 1e-5)
                     beta_scores = torch.Tensor(output_scores[:,1] + 1e-5)
                     loss = self.loss_func(y_batch, alpha_scores, beta_scores)
-                    # alpha_y = torch.Tensor(y_batch[:,0] + 1e-5)
-                    # beta_y = torch.Tensor(y_batch[:,1] + 1e-5)
-                    # y_distrib = Beta(alpha_y, beta_y)
-                    # loss = self.loss_func(output_distrib, y_distrib).mean()
                 elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
                     means = torch.Tensor(output_scores[:,0:2])      # (batch_size, 2)
                     stds = torch.Tensor(output_scores[:,2:4])       # (batch_size, 2)
-                    # comp = D.Normal(means, stds)
-                    # dim = comp.scale.size()[0]                    # normally this would be batch_size... but weirdly there's a random batch with size 24?
-                    # mix = D.Categorical(torch.ones(dim,2))
-                    loss = self.loss_func(y_batch, means, stds)
+                    weights = torch.Tensor(output_scores[:,4:6])    # (batch_size, 2)
+                    loss = self.loss_func(y_batch, means, stds, weights)
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
@@ -436,7 +430,8 @@ class RatingModel(object):
                 elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
                     means = torch.Tensor(output_scores[:,0:2])
                     stds = torch.Tensor(output_scores[:,2:4])
-                    loss = self.loss_func(y_batch, means, stds)
+                    weights = torch.Tensor(output_scores[:,4:6])
+                    loss = self.loss_func(y_batch, means, stds, weights)
                 
                 total_val_loss += loss.item()                                                       
                 output_scores = output_scores.data.tolist()
@@ -452,7 +447,7 @@ class RatingModel(object):
                     elif self.cfg.PREDICTION_TYPE == 'rating':
                         temp_rating[s] = output_scores[cnt][0]          # float
                     elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-                        temp_rating[s] = output_scores[cnt]             # [4-dim of mean1, mean2, std1, std2]
+                        temp_rating[s] = output_scores[cnt]             # [6-dim of mean1, mean2, std1, std2, weight1, weight2]
                     cnt += 1
                 for curr_score in temp_rating:
                     y_preds_lst.append(curr_score)                      # y_preds_lst = list of lists of length 7 if discretized distribution
@@ -474,9 +469,12 @@ class RatingModel(object):
 
         elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':         
             # taking the np.corrcoef of the means from the original, and the means from the mixed gaussian
-            # y_preds_lst = (batch_size, 4)  i.e. the (mean_1, mean_2, std_1, std_2)
+            # y_preds_lst = (batch_size, 6)  i.e. the (mean_1, mean_2, std_1, std_2, weight1, weight2)
             # y_val = (batch_size, 9) i.e. number of scores
-            preds_means = [np.mean(params[0:2]) for params in y_preds_lst]
+            # preds_means = [np.mean(params[0:2]) for params in y_preds_lst]
+            y_preds_lst = np.array(y_preds_lst)
+            # print("y_preds_lst: ", y_preds_lst)
+            preds_means = [np.sum(np.multiply(norm(y_preds_lst[:,4:6]), y_preds_lst[:,0:2]),1)]   # sum of (normalized/weighted means)
             val_means = [np.mean(scores) for scores in y_val]
             val_coeff = np.corrcoef(np.array(preds_means), np.array(val_means))[0, 1] 
 

@@ -10,13 +10,11 @@ from torch.nn import init
 import torch.nn as nn
 from tqdm import tqdm
 
-'''
-
-Didn't change anything here from original utils.py file (from Implicature-Strength-Some)
-
-'''
 
 
+def norm(list):
+    tot = np.sum(list)
+    return np.divide(list, tot)
 
 def mkdir_p(path):
     """Create a directory if not exist"""
