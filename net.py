@@ -475,12 +475,12 @@ class BiLSTMAttn_Beta(nn.Module):
             self.attention = SelfAttention(self.hidden_dim*2, self.is_gpu)
             self.get_score = nn.Sequential(
                 nn.Linear(self.hidden_dim*2, self.params, bias=True),
-                nn.PReLU())                               # can't use softmax because alpha/beta params can be > 1!
+                ELU_1())                               # can't use softmax because alpha/beta params can be > 1!
         else:
             self.attention = SelfAttention(self.hidden_dim, self.is_gpu)
             self.get_score = nn.Sequential(
                 nn.Linear(self.hidden_dim, self.params, bias=True),
-                nn.PReLU())                            # can't use softmax because alpha/beta params can be > 1!
+                ELU_1())                            # can't use softmax because alpha/beta params can be > 1!
 
     def forward(self, x, batch_size, seq_lens):
         """

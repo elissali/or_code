@@ -101,7 +101,7 @@ class RatingModel(object):
                 batch_size = y.shape[0]
                 loss = 0
                 for i in range(batch_size):
-                    beta = Beta(param_1, param_2)
+                    beta = Beta(param_1[i], param_2[i])
                     sample = torch.Tensor(y)[i].reshape(-1,1)
                     for j in sample:                            # this is because log_prob is inf for score = 1.0 or 0.0, which makes loss=nan
                         if j == 0: j += 1.0e-3
