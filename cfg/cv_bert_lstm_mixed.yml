@@ -13,7 +13,7 @@ PREDICTION_TYPE: 'mixed_gauss'              # can be: 'rating', 'discrete_distri
 
 
 TRAIN:
-    LR: 5.0e-5                              # ReLU is super dead, needs to be at least 1e-5 if ReLU for beta_distrib
+    LR: 5.0e-5                 
     TOTAL_EPOCH: 50            # set this to 500 during actual training
     INTERVAL: 10
     START_EPOCH: 0
