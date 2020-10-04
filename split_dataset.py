@@ -72,7 +72,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     dict_sentence_mean = input_df.groupby('tgrep.id')['response_val'].mean().to_dict()      # {tgrep.id : mean}
     dict_sentence_var = input_df.groupby('tgrep.id')['response_val'].var().to_dict()        # {tgrep.id : var}
     dict_raw_distrib = input_df.groupby('tgrep.id')['response_val'].apply(list).to_dict()   # {tgrep.id : [raw ratings]}
-    dict_beta = input_df.groupby('tgrep.id')['response_val'].apply(lambda x: stats.beta.fit(x)[0:2]).to_dict()  ## {tgrep.id : [alpha, beta]}
+    # dict_beta = input_df.groupby('tgrep.id')['response_val'].apply(lambda x: stats.beta.fit(x)[0:2]).to_dict()  ## {tgrep.id : [alpha, beta]}
 
     input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)          # discretize raw ratings
     ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
