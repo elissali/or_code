@@ -189,8 +189,6 @@ def load_dataset(input1, t):
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_mean, dict_item_sentence
     
-    elif t == 'mdn_distrib':
-        pass
 
 
 def random_input(num_examples):
@@ -410,7 +408,9 @@ def main():
             train_loss_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
             val_loss_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
             val_r_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
-            normalized_labels = np.array(normalized_labels)/7                                           # need to divide by 7 to normalize it; not needed in data_2 version
+            normalized_labels = np.array(normalized_labels)
+            if cfg.PREDICTION_TYPE != 'discrete_distrib':
+                normalized_labels = normalized_labels/7                                           # need to divide by 7 to normalize it; not needed in data_2 version
             sl_np = np.array(sl)
             fold_cnt = 1
             for train_idx, val_idx in k_folds_idx(cfg.KFOLDS, 871, cfg.SEED):                           # manual 871 training size here

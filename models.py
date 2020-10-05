@@ -245,7 +245,7 @@ class RatingModel(object):
              chopping/padding
         """
         X_train, X_val = X["train"], X["val"]
-        y_train, y_val = y["train"], y["val"]           # shape = (696, 7) if discrete_distrib; (696, 1) if rating; (696, 2) if beta
+        y_train, y_val = y["train"], y["val"]           # shape = (696, 7) if discrete_distrib; (696, 1) if rating
         L_train, L_val = L["train"], L["val"]
         
         y_train = np.expand_dims(y_train, axis=1)       # shape = (696, 1, 7) if discrete_distrib
@@ -456,6 +456,9 @@ class RatingModel(object):
         y_val = y_val[val_inds]                                         # same shape as y_preds_lst: (batch_size, param_size), e.g. (175, 7) or (175, 9)
         
         if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
+            # preds_means = [np.mean(np.array(scores) * [1,2,3,4,5,6,7]) for scores in y_preds_lst]
+            # val_means = [np.mean(np.array(scores) * [1,2,3,4,5,6,7]) for scores in y_val]
+            # val_coeff = np.corrcoef(np.array(preds_means), np.array(val_means))[0,1]
             val_coeff = np.mean([np.corrcoef(i, j)[0,1] for i, j in zip(np.array(y_preds_lst), np.array(y_val))])
     
         elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
@@ -474,7 +477,7 @@ class RatingModel(object):
             # y_val = (batch_size, 9) i.e. number of scores
             # preds_means = [np.mean(params[0:2]) for params in y_preds_lst]
             y_preds_lst = np.array(y_preds_lst)
-            # print("y_preds_lst: ", y_preds_lst)
+            print("y_preds_lst: ", y_preds_lst)
             preds_means = [np.sum(np.multiply(norm(y_preds_lst[:,4:6]), y_preds_lst[:,0:2]),1)]   # sum of (normalized/weighted means)
             val_means = [np.mean(scores) for scores in y_val]
             val_coeff = np.corrcoef(np.array(preds_means), np.array(val_means))[0, 1] 
