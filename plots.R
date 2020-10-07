@@ -59,8 +59,9 @@ means$Predictor = factor(means$Predictor, levels=c("Either", "DE"), ordered=T)
 dodge = position_dodge(.9)
 jitter = position_jitter(width = .2)
 
-qualplot = ggplot(means, aes(x=Value,y=Prediction)) +                               # plot the means 
-  geom_point(data=dqual_all,aes(y=Preds),alpha=.1, color=cbPalette[2], position=jitter,size=2) +
+qualplot = ggplot(means, aes(x=Value,y=Prediction)) +                               # plot the means
+  geom_point(data=dqual_all,aes(y=Preds),alpha=.3, color=cbPalette[2], position=jitter,size=2) +
+  geom_errorbar(aes(ymin=YMin, ymax=YMax), width=.2, position=position_dodge(.9)) +
   geom_point(position=dodge,color="black", fill=cbPalette[6], pch=21,size=7) +
   scale_fill_manual(values=cbPalette[c(1,2)]) +
   scale_color_manual(values=cbPalette[c(1,2)]) + theme_bw() +
