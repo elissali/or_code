@@ -62,7 +62,7 @@ jitter = position_jitter(width = .2)
 qualplot = ggplot(means, aes(x=Value,y=Prediction)) +                               # plot the means
   geom_point(data=dqual_all,aes(y=Preds),alpha=.3, color=cbPalette[2], position=jitter,size=2) +
   geom_errorbar(aes(ymin=YMin, ymax=YMax), width=.2, position=position_dodge(.9)) +
-  geom_point(position=dodge,color="black", fill=cbPalette[6], pch=21,size=7) +
+  geom_point(position=dodge,color="black", fill=cbPalette[6], pch=21,size=5) +
   scale_fill_manual(values=cbPalette[c(1,2)]) +
   scale_color_manual(values=cbPalette[c(1,2)]) + theme_bw() +
   theme(legend.position = "bottom", axis.title.x = element_blank(), axis.text.x = element_text(size=9), strip.text = element_text(size=12)) +
