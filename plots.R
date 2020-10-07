@@ -26,11 +26,11 @@ dqual = merge(raw, preds, by="Item_ID")                                         
 dqual %<>%                                                                          # rename the column values
     mutate(Sentence=fct_reorder(Sentence,Preds)) %>%
     mutate_if(is.logical,funs(factor(.))) %>%
-    mutate(Either = fct_recode(Either,either_present="no",either_notpresent ="yes"),
-           DE = fct_recode(DE,downward_ent="DE",upward_ent="UE"))
+    mutate(Either = fct_recode(Either,"either \n present"="yes","either \n absent" ="no"),
+           DE = fct_recode(DE,"downward \n entailing"="DE","upward \n entailing"="UE"))
 
-dqual$Either = factor(dqual$Either, levels=c("either_present", "either_notpresent"), ordered = T)   # save these as factor vecs
-dqual$DE = factor(dqual$DE, levels=c("downward_ent", "upward_ent"), ordered=T)
+dqual$Either = factor(dqual$Either, levels=c("either \n present", "either \n absent"), ordered = T) # save these as factor vecs
+dqual$DE = factor(dqual$DE, levels=c("downward \n entailing", "upward \n entailing"), ordered=T)
 
 dqual_all = dqual %>%                                           
   mutate(Predictor="Either", Value=Either)
