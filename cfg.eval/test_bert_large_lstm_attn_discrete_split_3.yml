@@ -1,0 +1,33 @@
+SOME_DATABASE: './data_2.csv'  
+CONFIG_NAME: 'full_bert_large_lstm_attn_discrete_split_3'
+EXPERIMENT_NAME: 'full_bert_large_lstm_attn_discrete_split_3'
+SINGLE_SENTENCE: True
+IS_ELMO: False
+IS_BERT: True
+BERT_LARGE: True
+BERT_LAYER: 18
+CUDA: True
+GPU_NUM: 1                                  ####### this is unique to BERT
+PREDICTION_TYPE: 'discrete_distrib'              # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mean_var', 'mixed_gauss'
+CROSS_VALIDATION_FLAG: False
+SPLIT_NAME: '3'
+PREDON: 'test'                             ####### remember to set this to 'test' vs. 'train'
+MODE: 'test'
+SAVE_PREDS: True
+
+TRAIN:
+    LR: 5.0e-6                 
+    TOTAL_EPOCH: 210            # set this to 500 during actual training
+    INTERVAL: 210
+    START_EPOCH: 0
+    BATCH_SIZE: 32             # discrete_distrib only
+    LR_DECAY_RATE: 0.85
+    FLAG: False
+
+LSTM:                      # can adjust these
+    FLAG: True
+    SEQ_LEN: 50
+    HIDDEN_DIM: 200
+    LAYERS: 2
+    DROP_PROB: 0.7
+    ATTN: True 

@@ -13,7 +13,7 @@ from scipy import stats
 
 #from allennlp.commands.elmo import ElmoEmbedder # DO_NOTHING
 from easydict import EasyDict as edict
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
@@ -249,6 +249,8 @@ def main():
         load_db = curr_path + "/" + cfg.PREDON + "_db.csv"
 
 
+    print(load_db)
+
     ################################# LOADING WORD EMBEDDINGS ##################################
 
     sl = []
@@ -267,6 +269,9 @@ def main():
             sentences = [x.strip() for x in qual_file.readlines()]
 
     NUMPY_DIR = './datasets/seed_' + str(cfg.SEED)
+    if cfg.SPLIT_NAME != "":
+        NUMPY_DIR = os.path.join(NUMPY_DIR, cfg.SPLIT_NAME)
+
     # is contextual or not
     if not cfg.SINGLE_SENTENCE:
         NUMPY_DIR += '_contextual'
@@ -305,7 +310,7 @@ def main():
             #ELMO_EMBEDDER = EL
             sl = sl # DO_NOTHING
         if cfg.IS_BERT:
-            from pytorch_transformers import BertTokenizer, BertModel
+            from transformers import BertTokenizer, BertModel
             bert_model = 'bert-large-uncased' if cfg.BERT_LARGE else 'bert-base-uncased'
             bert_tokenizer = BertTokenizer.from_pretrained(bert_model)
             bert_model = BertModel.from_pretrained(bert_model, output_hidden_states=True)

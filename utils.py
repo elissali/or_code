@@ -3,7 +3,7 @@ import errno
 from copy import deepcopy
 import string
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.nn import init

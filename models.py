@@ -8,8 +8,6 @@ import time
 
 # from allennlp.commands.elmo import ElmoEmbedder
 from easydict import EasyDict as edict
-import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -102,7 +100,7 @@ class RatingModel(object):
                 loss = 0
                 for i in range(batch_size):
                     beta = Beta(param_1[i], param_2[i])
-                    sample = torch.Tensor(y)[i].reshape(-1,1)
+                    sample = y[i].reshape(-1,1)
                     for j in sample:                            # this is because log_prob is inf for score = 1.0 or 0.0, which makes loss=nan
                         if j == 0: j += 1.0e-3
                         elif j == 1: j-= 1.0e-3
@@ -120,7 +118,7 @@ class RatingModel(object):
                     dim = comp.scale.size()[0]                      # normally this would be batch_size... but weirdly there's a random batch with size 24?
                     mix = D.Categorical(weights)
                     gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
-                    log_likelihood = gmm.log_prob(torch.Tensor(y.reshape(-1,1)))
+                    log_likelihood = gmm.log_prob(y.reshape(-1,1))
                     print("gnll log likelihood: ", log_likelihood)
                     return -1*torch.mean(log_likelihood)     
                 else:
@@ -130,7 +128,7 @@ class RatingModel(object):
                         comp = D.Normal(means[i], stds[i])
                         mix = D.Categorical(weights[i])
                         gmm = MixtureSameFamily(mixture_distribution=mix, component_distribution=comp)
-                        log_likelihood = gmm.log_prob(torch.Tensor(y)[i].reshape(-1,1))
+                        log_likelihood = gmm.log_prob(y[i].reshape(-1,1))
                         # if torch.mean(log_likelihood) > 0:
                             # print("gnll loss: ", torch.mean(log_likelihood))
                         loss -= torch.mean(log_likelihood)
@@ -155,7 +153,7 @@ class RatingModel(object):
             # torch._C._cuda_setDevice(-1)        #?????
 
             cudnn.benchmark = True
-            self.loss_func.cuda()
+            #self.loss_func.cuda()
 
     def load_network(self):
         """Initialize the network or load from checkpoint"""
@@ -317,13 +315,13 @@ class RatingModel(object):
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)     # needs to be log because KLDiv 
                 elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-                    alpha_scores = torch.Tensor(output_scores[:,0] + 1e-5)
-                    beta_scores = torch.Tensor(output_scores[:,1] + 1e-5)
+                    alpha_scores = output_scores[:,0] + 1e-5
+                    beta_scores = output_scores[:,1] + 1e-5
                     loss = self.loss_func(y_batch, alpha_scores, beta_scores)
                 elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-                    means = torch.Tensor(output_scores[:,0:2])      # (batch_size, 2)
-                    stds = torch.Tensor(output_scores[:,2:4])       # (batch_size, 2)
-                    weights = torch.Tensor(output_scores[:,4:6])    # (batch_size, 2)
+                    means = output_scores[:,0:2]      # (batch_size, 2)
+                    stds = output_scores[:,2:4]       # (batch_size, 2)
+                    weights = output_scores[:,4:6]    # (batch_size, 2)
                     loss = self.loss_func(y_batch, means, stds, weights)
 
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
@@ -404,7 +402,7 @@ class RatingModel(object):
                     y_batch = torch.from_numpy(y_batch).float().resize_((len(y_batch),1))       # y_batch by itself is [32]; need to resize to [32,1] 
                 elif self.cfg.PREDICTION_TYPE == "discrete_distrib":                            # for consistency to avoid error from broadcasting
                     y_batch = torch.from_numpy(y_batch).float()
-                elif self.cfg.PREDICTION_TYPE == "beta_distrib" or self.cfg.PREDICTION_TYPE == "mean_var":
+                elif self.cfg.PREDICTION_TYPE == "beta_distrib" or self.cfg.PREDICTION_TYPE == "mean_var" or self.cfg.PREDICTION_TYPE == "mixed_gauss":
                     y_batch = torch.from_numpy(y_batch).float()
                 
                 if self.cfg.CUDA:
@@ -422,15 +420,15 @@ class RatingModel(object):
                 if self.cfg.PREDICTION_TYPE == 'discrete_distrib':
                     loss = self.loss_func(output_scores.log(), y_batch)                             # needs to be log because KLDiv sucks; this is batch loss
                 elif self.cfg.PREDICTION_TYPE == 'beta_distrib':
-                    alpha_scores = torch.Tensor(output_scores[:,0] + 1e-5)
-                    beta_scores = torch.Tensor(output_scores[:,1] + 1e-5)
+                    alpha_scores = output_scores[:,0] + 1e-5
+                    beta_scores = output_scores[:,1] + 1e-5
                     loss = self.loss_func(y_batch, alpha_scores, beta_scores)   
                 elif self.cfg.PREDICTION_TYPE == 'rating' or self.cfg.PREDICTION_TYPE == 'mean_var':
                     loss = self.loss_func(output_scores, y_batch)
                 elif self.cfg.PREDICTION_TYPE == 'mixed_gauss':
-                    means = torch.Tensor(output_scores[:,0:2])
-                    stds = torch.Tensor(output_scores[:,2:4])
-                    weights = torch.Tensor(output_scores[:,4:6])
+                    means = output_scores[:,0:2]
+                    stds = output_scores[:,2:4]
+                    weights = output_scores[:,4:6]
                     loss = self.loss_func(y_batch, means, stds, weights)
                 
                 total_val_loss += loss.item()                                                       
