@@ -1,0 +1,29 @@
+SOME_DATABASE: './data_2.csv'  
+CONFIG_NAME: 'cv_bert_lstm_mixed_lr5e-5'
+EXPERIMENT_NAME: 'cv_bert_lstm_mixed_lr5e-5'
+SINGLE_SENTENCE: True
+IS_ELMO: False
+IS_BERT: True
+BERT_LARGE: False
+PREDON: 'train'                             ####### remember to set this to 'test' vs. 'train'
+CUDA: True
+GPU_NUM: 1
+DATASET_NAME: 'replication'                                  ####### this is unique to BERT
+PREDICTION_TYPE: 'mixed_gauss'              # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mean_var', 'mixed_gauss'
+
+
+
+TRAIN:
+    LR: 5.0e-5                 
+    TOTAL_EPOCH: 50            # set this to 500 during actual training
+    INTERVAL: 10
+    START_EPOCH: 0
+    BATCH_SIZE: 32             # mixed_gauss only
+
+LSTM:                      # can adjust these
+    FLAG: True
+    SEQ_LEN: 50
+    HIDDEN_DIM: 200
+    LAYERS: 2
+    DROP_PROB: 0.7
+    ATTN: False 

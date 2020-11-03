@@ -29,7 +29,7 @@ from utils import mkdir_p
 print("done importing")
 
 cfg = edict()
-cfg.SOME_DATABASE = './data.csv'                    # './data_2.csv'   
+cfg.SOME_DATABASE = './data.csv'                    # './data_2.csv'
 cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
@@ -37,8 +37,9 @@ cfg.MODE = 'train'                                  # remember to change to 'tes
 cfg.PREDICTION_TYPE = 'discrete_distrib'            # can be: 'rating', 'discrete_distrib', 'beta_distrib', 'mean_var', 'mixed_gauss'
 cfg.SINGLE_SENTENCE = True
 cfg.EXPERIMENT_NAME = ''
+cfg.DATASET_NAME = ''
 cfg.OUT_PATH = './'
-cfg.GLOVE_DIM = 100                     
+cfg.GLOVE_DIM = 100
 cfg.IS_ELMO = True
 cfg.IS_BERT = False
 cfg.ELMO_LAYER = 2
@@ -49,7 +50,7 @@ cfg.SAVE_PREDS = False                              # can adjust
 cfg.BATCH_ITEM_NUM = 30
 cfg.PREDON = 'test'                                 # leave this as 'test'
 cfg.CUDA = False
-cfg.GPU_NUM = 1                        
+cfg.GPU_NUM = 1
 cfg.KFOLDS = 5
 cfg.CROSS_VALIDATION_FLAG = True                    # this can be changed
 cfg.SPLIT_NAME = ""
@@ -60,7 +61,7 @@ cfg.LSTM.SEQ_LEN = 20
 cfg.LSTM.HIDDEN_DIM = 100
 cfg.LSTM.DROP_PROB = 0.2
 cfg.LSTM.LAYERS = 2
-cfg.LSTM.BIDIRECTION = True 
+cfg.LSTM.BIDIRECTION = True
 cfg.LSTM.ATTN = False
 
 # Training options
@@ -133,7 +134,7 @@ def load_dataset(input1, t):
     #         dict_item_params[k] = [dict_alpha[k], dict_beta[k]]
     #         dict_item_sentence[k] = dict_item_sentence_raw[k]
     #     return dict_item_params, dict_item_sentence
-    
+
     if t == 'mixed_gauss' or t == 'beta_distrib':
         # dict_means = input_df[['Item', 'Mixed_Means']].groupby('Item')['Mixed_Means'].apply(list)
         # dict_stds = input_df[['Item', 'Mixed_Stds']].groupby('Item')['Mixed_Stds'].apply(list)
@@ -145,7 +146,7 @@ def load_dataset(input1, t):
             v = v[0]
             v = v.strip(']')
             v = v.strip('[')
-            v = v.split()        
+            v = v.split()
             v = [float(i) for i in v]
             return v
 
@@ -166,7 +167,7 @@ def load_dataset(input1, t):
             dict_item_params[k] = [dict_mean[k], dict_var[k]]
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_params, dict_item_sentence
-    
+
     elif t == 'discrete_distrib':
         dict_discrete = input_df[['Item', 'Discrete_Distrib']].groupby('Item')['Discrete_Distrib'].apply(list)
         dict_item_distrib = dict()
@@ -179,7 +180,7 @@ def load_dataset(input1, t):
             dict_item_distrib[k] = v
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_distrib, dict_item_sentence
-    
+
     elif t == 'rating':
         dict_item_mean_raw = input_df[['Item', 'Mean']].groupby('Item')['Mean'].apply(list).to_dict()
         dict_item_mean = dict()
@@ -188,7 +189,7 @@ def load_dataset(input1, t):
             dict_item_mean[k] = v[0]
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_mean, dict_item_sentence
-    
+
 
 
 def random_input(num_examples):
@@ -227,7 +228,7 @@ def main():
     if cfg.CUDA:
         torch.cuda.manual_seed_all(cfg.SEED)
 
-    curr_path = "./datasets/seed_" + str(cfg.SEED)
+    curr_path = "./datasets/" + str(cfg.DATASET_NAME) + "_seed_" + str(cfg.SEED)
     if cfg.SPLIT_NAME != "":
       curr_path = os.path.join(curr_path, cfg.SPLIT_NAME)
     if cfg.EXPERIMENT_NAME == "":
@@ -266,7 +267,7 @@ def main():
         with open(load_db, "r") as qual_file:
             sentences = [x.strip() for x in qual_file.readlines()]
 
-    NUMPY_DIR = './datasets/seed_' + str(cfg.SEED)
+    NUMPY_DIR = './datasets/' + str(cfg.DATASET_NAME) +  '_seed_' + str(cfg.SEED)
     if cfg.SPLIT_NAME != "":
         NUMPY_DIR = os.path.join(NUMPY_DIR, cfg.SPLIT_NAME)
 
@@ -371,9 +372,9 @@ def main():
 
 
     ################################# LOADING Y-LABELS ##################################
-    
+
     normalized_labels = []      # list of arrays
-    keys = []                   # list of tgrep ids                                                                            
+    keys = []                   # list of tgrep ids
     if not cfg.MODE == 'qual':
         if cfg.PREDICTION_TYPE == "discrete_distrib":
             for (k, v) in labels.items():
@@ -388,11 +389,11 @@ def main():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))           # (871, 9) or (871, 8)
         elif cfg.PREDICTION_TYPE == "mixed_gauss":
-            for (k, v) in labels.items():                           
+            for (k, v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))           # (871, 9) or (871, 8)
         # print(np.array(normalized_labels).shape)
-        
+
     ##################################### TRAINING #######################################
 
     if cfg.TRAIN.FLAG:
@@ -441,7 +442,7 @@ def main():
                 val_r_history[:, fold_cnt-1] = np.array(r_model.val_r_history)
                 fold_cnt += 1
 
-            # get total average train/val loss and r over all folds    
+            # get total average train/val loss and r over all folds
             train_loss_mean = np.mean(train_loss_history, axis=1).tolist()
             val_loss_mean = np.mean(val_loss_history, axis=1).tolist()
             val_r_mean = np.mean(val_r_history, axis=1).tolist()
@@ -451,7 +452,7 @@ def main():
             logging.info(f'Avg. train loss: {train_loss_mean}')
             logging.info(f'Avg. validation loss: {val_loss_mean}')
             logging.info(f'Avg. validation r: {val_r_mean}')
-    
+
 
     ##################################### TESTING #######################################
 
@@ -483,7 +484,7 @@ def main():
                 new_file_name = attn_path + '/' + cfg.PREDON + '_attn_epoch' + format(epoch) + '.npy'
                 np.save(new_file_name, attn_weights)
                 logging.info(f'Write attention weights to {new_file_name}.')
-            
+
             print("Checkpoint: Predicting correlation coefficients... ")
             print(len(normalized_labels))                                   # checkpoint; normalized_labels should be same shape as preds
             print(preds.shape)
@@ -493,7 +494,7 @@ def main():
             curr_coeff_lst.append(curr_coeff)
 
             # if current epoch's coeff is the best one so far, save this coeff and save this epoch
-            if max_value < curr_coeff: 
+            if max_value < curr_coeff:
                 max_value = curr_coeff
                 max_epoch_dir = cfg.RESUME_DIR
                 max_epoch = epoch
