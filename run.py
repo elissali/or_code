@@ -29,7 +29,7 @@ from utils import mkdir_p
 print("done importing")
 
 cfg = edict()
-cfg.SOME_DATABASE = './data_2.csv'      
+cfg.SOME_DATABASE = './data.csv'                    # './data_2.csv'   
 cfg.CONFIG_NAME = ''
 cfg.RESUME_DIR = ''
 cfg.SEED = 0
@@ -153,7 +153,7 @@ def load_dataset(input1, t):
             # means = helper(k, means)
             # stds = helper(k, dict_stds[k])
             # dict_item_params[k] = [means, stds]                         # {tgrep : [[mean1, mean2], [std1, std2]]}
-            dict_item_scores[k] = helper(raw)[:9]                         # cut it off at 9, since these are inconsistent lengths
+            dict_item_scores[k] = helper(raw)[:8]                         # cut it off at 8, since these are inconsistent lengths; this was 9 for data_2
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_scores, dict_item_sentence
 
@@ -189,8 +189,6 @@ def load_dataset(input1, t):
             dict_item_sentence[k] = dict_item_sentence_raw[k]
         return dict_item_mean, dict_item_sentence
     
-    elif t == 'mdn_distrib':
-        pass
 
 
 def random_input(num_examples):
@@ -260,7 +258,7 @@ def main():
 
     if not cfg.MODE == 'qual':
         if not os.path.isfile(load_db):
-            split_train_test(cfg.SEED, curr_path)
+            split_train_test(cfg.SEED, curr_path, input=cfg.SOME_DATABASE)
         labels, target_utterances = load_dataset(load_db, cfg.PREDICTION_TYPE)
     else:
         if not os.path.isfile(load_db):
@@ -377,7 +375,7 @@ def main():
     normalized_labels = []      # list of arrays
     keys = []                   # list of tgrep ids                                                                            
     if not cfg.MODE == 'qual':
-        if cfg.PREDICTION_TYPE == "discrete_distrib" or cfg.PREDICTION_TYPE == "mean_var":
+        if cfg.PREDICTION_TYPE == "discrete_distrib":
             for (k, v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(list(map(float, v)))           # (871, 7)
@@ -385,18 +383,16 @@ def main():
             for (k, v) in labels.items():
                 keys.append(k)
                 normalized_labels.append(float(v))
-        elif cfg.PREDICTION_TYPE == "beta_distrib":
+        elif cfg.PREDICTION_TYPE == "beta_distrib":                     # (871, 9) or (871, 8)
             for (k,v) in labels.items():
                 keys.append(k)
-                normalized_labels.append(list(map(float, v)))           # (871, 2)
+                normalized_labels.append(list(map(float, v)))           # (871, 9) or (871, 8)
         elif cfg.PREDICTION_TYPE == "mixed_gauss":
             for (k, v) in labels.items():                           
                 keys.append(k)
-                normalized_labels.append(list(map(float, v)))           # (871, 9)
-                # flat_v = [item for sublist in v for item in sublist]
-                # normalized_labels.append(flat_v)                      # [mean1, mean2, std1, std2, weight1, weight2]
-
-
+                normalized_labels.append(list(map(float, v)))           # (871, 9) or (871, 8)
+        # print(np.array(normalized_labels).shape)
+        
     ##################################### TRAINING #######################################
 
     if cfg.TRAIN.FLAG:
@@ -408,7 +404,7 @@ def main():
             # no k-fold validation; super simple
             cfg.BATCH_ITEM_NUM = len(normalized_labels)//cfg.TRAIN.BATCH_SIZE
             X["train"], X["val"] = word_embs_stack.float(), None
-            y["train"], y["val"] = np.array(normalized_labels), None
+            y["train"], y["val"] = np.array(normalized_labels)/7, None                                  # need to divide by 7 to normalize it; not needed in data_2 version
             L["train"], L["val"] = sl, None
             r_model = RatingModel(cfg, save_path)
             r_model.train(X, y, L)
@@ -418,6 +414,8 @@ def main():
             val_loss_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
             val_r_history = np.zeros((cfg.TRAIN.TOTAL_EPOCH, cfg.KFOLDS))
             normalized_labels = np.array(normalized_labels)
+            if cfg.PREDICTION_TYPE != 'discrete_distrib':
+                normalized_labels = normalized_labels/7                                           # need to divide by 7 to normalize it; not needed in data_2 version
             sl_np = np.array(sl)
             fold_cnt = 1
             for train_idx, val_idx in k_folds_idx(cfg.KFOLDS, 871, cfg.SEED):                           # manual 871 training size here

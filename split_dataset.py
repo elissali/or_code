@@ -53,7 +53,7 @@ def get_mixture(scores_dict):
     return mixed_means, mixed_stdevs 
 
 
-def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, test_pct = 0.3):
+def split_train_test(seed_num, save_path, input = './data.csv', buckets = 7, test_pct = 0.3):
 
     # this function doesn't return anything; it just takes the input file
     # and writes it into two separate train/test csv files (it will create those files)
@@ -72,9 +72,9 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     dict_sentence_mean = input_df.groupby('tgrep.id')['response_val'].mean().to_dict()      # {tgrep.id : mean}
     dict_sentence_var = input_df.groupby('tgrep.id')['response_val'].var().to_dict()        # {tgrep.id : var}
     dict_raw_distrib = input_df.groupby('tgrep.id')['response_val'].apply(list).to_dict()   # {tgrep.id : [raw ratings]}
-    dict_beta = input_df.groupby('tgrep.id')['response_val'].apply(lambda x: stats.beta.fit(x)[0:2]).to_dict()  ## {tgrep.id : [alpha, beta]}
+    # dict_beta = input_df.groupby('tgrep.id')['response_val'].apply(lambda x: stats.beta.fit(x)[0:2]).to_dict()  ## {tgrep.id : [alpha, beta]}
 
-    input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil)          # discretize raw ratings
+    input_df['response_val'] = (input_df['response_val'] * 1).apply(np.ceil)                # discretize raw ratings; input_df['response_val'] = (input_df['response_val'] * buckets).apply(np.ceil) if not pre-discretized
     ratings_list = input_df.groupby('tgrep.id')['response_val'].apply(list)
     dict_discrete_distrib = get_distrib_dict(ratings_list, buckets)                         # {tgrep.id : [7-bucket distribution]}
     dict_mixed_means, dict_mixed_stdevs = get_mixture(dict_raw_distrib)                     # {tgrep.id : [mean1, mean2]}  ;  {tgrep.id : [stdev1, stdev2]} - see or-scratchpad-8
@@ -84,6 +84,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     big_list = []
     for (key, val) in dict_id_to_sentence.items():
         if val[0] == 'nan': continue
+        elif isinstance(val[0], float): continue
         else:
             sentence_str = re.sub(" but not both", "", val[0])                          # the sentence string
             raw_distrib = str(dict_raw_distrib[key]).replace(",", " ")
@@ -91,11 +92,9 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
             mean = str(dict_sentence_mean[key])
             # var = str(dict_sentence_var[key])
             var = str(np.var(dict_raw_distrib[key]))
-            alpha, beta = dict_beta[key]                                                # this is a duplicate of the following row (kinda)
-            beta_params = str(dict_beta[key]).replace(",", " ")                         # dunno whether I want alpha/beta in one tuple, or separated
             mixed_means = str(dict_mixed_means[key]).replace(",", " ")
             mixed_stds = str(dict_mixed_stdevs[key]).replace(",", " ")
-            example = key + ',' + mean + ',' + var + ',' + str(alpha) + ',' + str(beta) + ',' + beta_params + ',' + mixed_means + ',' + mixed_stds + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
+            example = key + ',' + mean + ',' + var + ',' + mixed_means + ',' + mixed_stds + ',' + raw_distrib + ',' + discrete_distrib + ',' + '"' + format(sentence_str) + '"'
             big_list.append(example)
                 # big_list is a list of strings formatted: 'tgrep.id, mean, var, alpha, beta, beta_params, mixed_means, mixed_stds, raw_distrib, discrete_distrib, sentence'
 
@@ -110,7 +109,7 @@ def split_train_test(seed_num, save_path, input = './data_2.csv', buckets = 7, t
     test_ids = ids[num_train:]      # testing examples = what's left over, by index in big_list
 
     mkdir_p(save_path)
-    head_line = "Item,Mean,Var,Alpha,Beta,Beta_Params,Mixed_Means,Mixed_Stds,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
+    head_line = "Item,Mean,Var,Mixed_Means,Mixed_Stds,Raw_Distrib,Discrete_Distrib,Sentence\n"                   # set the header
     f = open(save_path + '/train_db.csv', 'w')  # creates an empty /train_db.csv file at this path
     f.write(head_line)
     for i in train_ids:
